@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 // DOM Hebrew RTL UI over the canvas. Reads GameState, calls handlers only (no sim logic, no canvas).
-import type { GameState, UiApi, UiHandlers, Selection, LevelDef, Save, DayResult, UpgradeDef, Truck, TruckJob } from '../sim/types.ts';
+import type { GameState, UiApi, UiHandlers, Selection, LevelDef, Save, DayResult, UpgradeDef, Truck, TruckJob, Cabin } from '../sim/types.ts';
+
+const inDepot = (c: Cabin) => c.siteId === null && c.slot === -1;
+const clean = (c: Cabin) => inDepot(c) && c.washT <= 0, dirty = (c: Cabin) => inDepot(c) && c.washT > 0;
 
 // UPGRADES come from the sim; resolved lazily so this module also loads before sim/index.ts exists.
 const simMods = import.meta.glob('../sim/index.ts', { eager: true }) as Record<string, { UPGRADES?: UpgradeDef[] }>;
@@ -113,12 +116,12 @@ export function createUi(): UiApi & UiExtra {
       if (!st) return;
       const cabs = s.cabins.filter((c) => c.siteId === st.def.id).sort((a, b) => a.slot - b.slot);
       const total = cabs.reduce((n, c) => n + c.fill / (c.capacity || 1), 0) / (cabs.length || 1);
-      const free = s.cabins.filter((c) => c.siteId === null).length;
+      const free = s.cabins.filter(clean).length, wash = s.cabins.filter(dirty).length;
       const status = st.closed ? 'האתר סגור' : st.open ? 'האתר פתוח' : 'עוד לא נפתח';
       html = `<h3><span>${st.def.type === 'wedding' ? '💒' : '🏗️'} ${esc(st.def.name)}</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
         `<div class="ui-sub">${status} · <span class="trend">${trendOf(st.def.id)}</span> · ${DROP}</div>` +
         `<div class="ui-cabins">${cabs.map((c) => { const p = pct(c.fill, c.capacity); return `<div class="cab"><div class="gauge ${heat(p)}"><i style="height:${p}%"></i></div>${p}%</div>`; }).join('') || '<div class="ui-sub">אין תאים באתר</div>'}</div>` +
-        `<div class="ui-sub">${cabs.length ? `ממוצע ${pct(total, 1)}%` : ''} · במחסן: ${free} תאים</div>` +
+        `<div class="ui-sub">${cabs.length ? `ממוצע ${pct(total, 1)}%` : ''} · במחסן: ${free} תאים${wash ? ` (${wash} בשטיפה)` : ''}</div>` +
         `<div class="row"><button class="btn" data-act="service"${st.closed ? ' disabled' : ''}>שלח משאבה</button></div>` +
         `<div class="row"><div class="step"><button data-act="minus" aria-label="פחות">−</button><span>${deliverN}</span><button data-act="plus" aria-label="עוד">+</button></div>` +
         `<button class="btn alt" data-act="deliver"${st.closed || !free ? ' disabled' : ''}>הצב תאים</button></div>`;
@@ -130,9 +133,10 @@ export function createUi(): UiApi & UiExtra {
         (t.carrying ? `<div class="ui-sub">מובילה ${t.carrying} תאים</div>` : '') +
         `<div class="row"><button class="btn alt" data-act="recall"${t.job === 'idle' ? ' disabled' : ''}>חזרה למחסן</button></div>`;
     } else {
-      const free = s.cabins.filter((c) => c.siteId === null).length;
+      const free = s.cabins.filter(clean).length, wash = s.cabins.filter(dirty).length;
       html = `<h3><span>🏭 המחסן</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
-        `<div class="ui-sub">תאים במלאי: <b>${free}</b></div>` +
+        `<div class="ui-sub">נקיים: <b>${free}</b> · בשטיפה: <b>${wash}</b></div>` +
+        (wash ? `<div class="ui-sub">תאים שחוזרים מאתר נשטפים לפני שיוצאים שוב.</div>` : '') +
         s.trucks.map((t) => { const p = pct(t.tank, t.tankCap); return `<div class="ui-sub">${esc(t.name)} · ${JOB[t.job][0]} · מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></div>`; }).join('') +
         `<div class="ui-sub">הציבו תאים דרך לחיצה על אתר.</div>`;
     }

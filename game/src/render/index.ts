@@ -19,7 +19,7 @@ function shadow(rx: number, ry: number): Graphics {
 }
 
 // ---- cabin view: sprite + fill gauge above the roof + red pulse ring on the ground ----
-interface CabinView { c: Container; gauge: Graphics; ring: Graphics; q: number }
+interface CabinView { c: Container; gauge: Graphics; ring: Graphics; q: number; wmax: number; splashT: number }
 function makeCabin(): CabinView {
   const c = new Container();
   const ring = new Graphics(); ring.ellipse(0, 0, 26, 13).fill({ color: 0xe5484d, alpha: 0.3 }).stroke({ width: 5, color: 0xe5484d });
@@ -28,7 +28,7 @@ function makeCabin(): CabinView {
   c.addChild(ring, shadow(18, 8), spr ?? art('cabin', 0.8));
   const mark = spr && logo(15); if (mark) { mark.position.set(-8, -25); c.addChild(mark); } // brand on the cream door
   const gauge = new Graphics(); c.addChild(gauge);
-  return { c, gauge, ring, q: -1 };
+  return { c, gauge, ring, q: -1, wmax: 0, splashT: 0 };
 }
 function drawCabinGauge(g: Graphics, ratio: number) {
   g.clear();
@@ -287,12 +287,27 @@ export function createRender(): RenderApi & RenderExtra {
       if (s.time !== lastEventTime) { handleEvents(s); lastEventTime = s.time; } // re-called without a sim step => don't replay FX
       // cabins
       const seen = new Set<string>();
+      let washK = 0;
       for (const c of s.cabins) {
-        if (c.siteId === null) continue;
+        if (c.siteId === null) {
+          if (c.slot !== -1 || c.washT <= 0) continue; // only dirty depot cabins are drawn: the wash line
+          seen.add(c.id);
+          let v = cabins.get(c.id);
+          if (!v) { v = makeCabin(); cabins.set(c.id, v); actors.addChild(v.c); }
+          const p = iso(map.depot.x + 70 + washK * 34, map.depot.y + 70 - washK * 6);
+          v.c.position.set(p.x, p.y); v.c.zIndex = p.y; v.c.tint = 0xa08868; v.ring.visible = false;
+          v.wmax = Math.max(v.wmax, c.washT);
+          const k = 1 - c.washT / v.wmax, q = 100 + Math.round(k * 20);
+          if (q !== v.q) { v.q = q; v.gauge.clear().roundRect(-14, -CABIN_H - 14, 28, 6, 3).fill({ color: 0x1b2a3a }).roundRect(-14, -CABIN_H - 14, 28 * k, 6, 3).fill({ color: 0x4fb3ff }); }
+          if (washK === 0 && (v.splashT -= dt) <= 0) { v.splashT = 0.7; fx.splash(p.x, p.y - CABIN_H * 0.35); } // the bay in use
+          washK++;
+          continue;
+        }
         const sv = sites.get(c.siteId); if (!sv) continue;
         seen.add(c.id);
         let v = cabins.get(c.id);
         if (!v) { v = makeCabin(); cabins.set(c.id, v); actors.addChild(v.c); }
+        v.c.tint = 0xffffff; v.wmax = 0;
         const sp = slotPos(sv.spot, c.slot), p = iso(sp.x, sp.y);
         v.c.position.set(p.x, p.y); v.c.zIndex = p.y;
         const ratio = c.capacity > 0 ? c.fill / c.capacity : 0;
