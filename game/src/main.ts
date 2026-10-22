@@ -45,7 +45,7 @@ function frame(now: number) {
       running = false; acc = 0;
       const r = dayResult(state);
       save = applyResult(save, r); persist();
-      ui.showDayEnd(r, save, LEVELS[save.level - 1] !== state.level ? LEVELS[save.level - 1] : LEVELS[state.level.id]);
+      ui.showDayEnd(r, save, level()); // saved level: the next one after a win, a retry after a loss, the last level replays
     }
   }
   render.update(state, dt);
