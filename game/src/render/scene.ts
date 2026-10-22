@@ -8,7 +8,7 @@ export const GROUND = 0xc4b89c;
 /** Fallback: draw the procedural ground/roads over the painted background (if its painted roads drift from the graph). */
 export const DRAW_ROADS = false;
 let bgKey: RealKey = 'bg'; // painted background of the mounted city (set by buildStatic)
-const ROAD_W = { main: 64, street: 42, sand: 36, check: 64 } as const;
+const ROAD_W = { main: 64, street: 42, sand: 36, check: 64, gate: 64 } as const;
 
 function drawRoads(g: Graphics, map: CityMap) {
   g.poly(isoRect(0, 0, map.width, map.height)).fill({ color: 0x9fb98a });
@@ -25,7 +25,7 @@ function drawRoads(g: Graphics, map: CityMap) {
   };
   const dn = node.get(map.depotNodeId)!;
   g.poly(seg(map.depot.x, map.depot.y, dn.x, dn.y, 26)).fill({ color: 0x55606c });
-  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.poly(seg(a.x, a.y, b.x, b.y, ROAD_W[e.kind])).fill({ color: e.kind === 'main' ? 0x3e434a : e.kind === 'sand' ? 0xd8bf8a : e.kind === 'check' ? 0x5a4a4a : 0x4d535b }); }
+  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.poly(seg(a.x, a.y, b.x, b.y, ROAD_W[e.kind])).fill({ color: e.kind === 'main' || e.kind === 'gate' ? 0x3e434a : e.kind === 'sand' ? 0xd8bf8a : e.kind === 'check' ? 0x5a4a4a : 0x4d535b }); }
   for (const e of map.edges) {
     if (e.kind !== 'main') continue;
     const a = node.get(e.a)!, b = node.get(e.b)!;
@@ -44,6 +44,23 @@ function drawRoads(g: Graphics, map: CityMap) {
       g.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 14, color: k % 2 ? 0xffffff : 0xd32f2f });
     }
   }
+}
+
+/** Crowd-flow gates: red tint + orange-white barrier stripes over every 'gate' edge. Render shows it only while a gate window is open. */
+export function buildGates(map: CityMap): Graphics {
+  const g = new Graphics();
+  const node = new Map(map.nodes.map((n) => [n.id, n]));
+  for (const e of map.edges) {
+    if (e.kind !== 'gate') continue;
+    const a = node.get(e.a)!, b = node.get(e.b)!;
+    g.poly(isoRect(Math.min(a.x, b.x) - 36, Math.min(a.y, b.y) - 36, Math.max(a.x, b.x) + 36, Math.max(a.y, b.y) + 36)).fill({ color: 0xd32f2f, alpha: 0.35 });
+    const len = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    for (let d = 20, k = 0; d + 22 < len - 20; d += 22, k++) {
+      const p = iso(a.x + ux * d, a.y + uy * d), q = iso(a.x + ux * (d + 22), a.y + uy * (d + 22));
+      g.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 14, color: k % 2 ? 0xffffff : 0xff7a00 });
+    }
+  }
+  return g;
 }
 
 /** Ground layer (under everything) + depot/decor as separate containers for the y-sorted dynamic layer. */
@@ -93,7 +110,7 @@ export function buildPad(spot: SiteSpot, type: SiteType, node?: { x: number; y: 
   }
   const back = iso(cx, y0 + 50);
   const painted = !!realTex(bgKey); // construction lots are painted into the background
-  const prop = con ? null : (type === 'beach' && realSprite('prop-beach', 0.5, 0.85, { w: 220 })) || (type === 'ceremony' && realSprite('prop-capital', 0.5, 0.85, { w: 220 })) || realSprite('prop-wedding', 0.5, 0.85, { w: 200 });
+  const prop = con ? null : (type === 'beach' && realSprite('prop-beach', 0.5, 0.85, { w: 220 })) || (type === 'ceremony' && realSprite('prop-capital', 0.5, 0.85, { w: 220 })) || (type === 'show' && realSprite('prop-beach', 0.5, 0.85, { w: 220 })) || realSprite('prop-wedding', 0.5, 0.85, { w: 200 });
   if (prop) { prop.position.set(back.x, back.y); c.addChild(prop); }
   else if (con) {
     if (painted) return { c, w, h, cx, cy, x0, y0, x1, y1 };

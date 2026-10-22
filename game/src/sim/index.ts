@@ -11,7 +11,7 @@ import economyJson from '../data/economy.json' with { type: 'json' };
 export const LEVELS = levelsJson as unknown as LevelDef[];
 export const ECON = economyJson as unknown as {
   cabinCapacity: number; cabinCarry: number; truck: { name: string; speed: number };
-  streetSpeedMult: number; sandSpeedMult: number; checkSpeedMult: number; dumpRate: number; pumpMinFill: number; feeOverflowTolerance: number;
+  streetSpeedMult: number; sandSpeedMult: number; checkSpeedMult: number; gateSpeedMult: number; dumpRate: number; pumpMinFill: number; feeOverflowTolerance: number;
   starFractions: number[]; upgrades: UpgradeDef[]; wash: { sec: number; bays: number };
 };
 export const UPGRADES: UpgradeDef[] = ECON.upgrades;
@@ -24,7 +24,11 @@ export function newSave(): Save {
 }
 
 // ---------- routing ----------
-const edgeMult = (kind: string) => (kind === 'street' ? ECON.streetSpeedMult : kind === 'sand' ? ECON.sandSpeedMult : kind === 'check' ? ECON.checkSpeedMult : 1);
+/** True while sim time t is inside one of the level's gateWindows (crowds on the gate roads). No windows -> never. */
+export const gateCrowded = (windows: LevelDef['gateWindows'], t: number) => !!windows && windows.some(([a, b]) => t >= a && t < b);
+const crowdedNow = (s: GameState) => gateCrowded(s.level.gateWindows, s.time);
+/** Speed multiplier of an edge kind; a 'gate' edge is plain asphalt unless its crowd window is open. */
+const edgeMult = (kind: string, crowded = false) => (kind === 'street' ? ECON.streetSpeedMult : kind === 'sand' ? ECON.sandSpeedMult : kind === 'check' ? ECON.checkSpeedMult : kind === 'gate' && crowded ? ECON.gateSpeedMult : 1);
 const nodeOf = (map: CityMap, id: string) => map.nodes.find((n) => n.id === id)!;
 function edgeBetween(map: CityMap, a: string, b: string) {
   return map.edges.find((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));
@@ -34,8 +38,8 @@ function edgeLen(map: CityMap, a: string, b: string): number {
   return Math.hypot(p.x - q.x, p.y - q.y);
 }
 
-/** Dijkstra on travel time (street edges cost 1/0.7). Returns node ids from..to, or [] if unreachable. */
-export function route(map: CityMap, from: string, to: string): string[] {
+/** Dijkstra on travel time (street edges cost 1/0.7). `crowded` = gate windows open now. Returns node ids from..to, or [] if unreachable. */
+export function route(map: CityMap, from: string, to: string, crowded = false): string[] {
   if (from === to) return [from];
   const dist = new Map<string, number>(), prev = new Map<string, string>();
   const done = new Set<string>();
@@ -53,7 +57,7 @@ export function route(map: CityMap, from: string, to: string): string[] {
     for (const e of map.edges) {
       const other = e.a === cur ? e.b : e.b === cur ? e.a : null;
       if (other === null || done.has(other)) continue;
-      const nd = best + edgeLen(map, cur, other) / edgeMult(e.kind);
+      const nd = best + edgeLen(map, cur, other) / edgeMult(e.kind, crowded);
       if (nd < dist.get(other)!) { dist.set(other, nd); prev.set(other, cur); }
     }
   }
@@ -63,11 +67,11 @@ export function route(map: CityMap, from: string, to: string): string[] {
 }
 
 /** Travel time in seconds along a node path at the given base speed. */
-export function pathTime(map: CityMap, path: string[], speed: number): number {
+export function pathTime(map: CityMap, path: string[], speed: number, crowded = false): number {
   let t = 0;
   for (let i = 0; i + 1 < path.length; i++) {
     const e = edgeBetween(map, path[i], path[i + 1])!;
-    t += edgeLen(map, path[i], path[i + 1]) / (speed * edgeMult(e.kind));
+    t += edgeLen(map, path[i], path[i + 1]) / (speed * edgeMult(e.kind, crowded));
   }
   return t;
 }
@@ -95,7 +99,7 @@ function setPose(s: GameState, t: Truck) {
 
 function startRoute(s: GameState, t: Truck, to: string): boolean {
   const from = t.path[t.path.length - 1];
-  const p = route(s.map, from, to);
+  const p = route(s.map, from, to, crowdedNow(s));
   if (p.length === 0) return false;
   t.path = p; t.seg = 0; t.segT = 0;
   setPose(s, t);
@@ -111,10 +115,11 @@ function retarget(s: GameState, t: Truck, to: string) {
     return;
   }
   const a = t.path[t.seg], b = t.path[t.seg + 1];
-  const len = edgeLen(s.map, a, b), mult = edgeMult(edgeBetween(s.map, a, b)!.kind);
-  const fwdRoute = route(s.map, b, to), backRoute = route(s.map, a, to);
-  const fwd = (1 - t.segT) * len / mult + pathTime(s.map, fwdRoute, 1) * 1;
-  const back = t.segT * len / mult + pathTime(s.map, backRoute, 1) * 1;
+  const cr = crowdedNow(s);
+  const len = edgeLen(s.map, a, b), mult = edgeMult(edgeBetween(s.map, a, b)!.kind, cr);
+  const fwdRoute = route(s.map, b, to, cr), backRoute = route(s.map, a, to, cr);
+  const fwd = (1 - t.segT) * len / mult + pathTime(s.map, fwdRoute, 1, cr) * 1;
+  const back = t.segT * len / mult + pathTime(s.map, backRoute, 1, cr) * 1;
   if (fwd <= back) { t.path = [a, ...fwdRoute]; } // keep going to b, then route
   else { t.path = [b, ...backRoute]; t.segT = 1 - t.segT; } // turn around
   t.seg = 0;
@@ -243,11 +248,11 @@ function stepTruck(s: GameState, t: Truck, dt: number) {
 /** Advance along the path; true when the end node is reached. */
 function move(s: GameState, t: Truck, dt: number): boolean {
   let dist = t.speed * dt;
-  const last = t.path.length - 1;
+  const last = t.path.length - 1, cr = crowdedNow(s);
   while (t.seg < last) {
     const a = t.path[t.seg], b = t.path[t.seg + 1];
     const len = edgeLen(s.map, a, b);
-    const eff = edgeMult(edgeBetween(s.map, a, b)!.kind);
+    const eff = edgeMult(edgeBetween(s.map, a, b)!.kind, cr);
     const remain = (1 - t.segT) * len; // px left on this edge
     const cost = remain / eff; // "speed-px" needed
     if (dist >= cost) { dist -= cost; t.seg++; t.segT = 0; }

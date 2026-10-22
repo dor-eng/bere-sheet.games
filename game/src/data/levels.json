@@ -676,7 +676,7 @@
   "unlock": {
    "kind": "city",
    "name": "עיר המופעים",
-   "desc": "בקרוב: העיר הבאה",
+   "desc": "הבא: עיר המופעים. בשיא הקהל השערים לאצטדיון ולהיכל נסגרים, נוסעים מסביב",
    "icon": "icon-star"
   },
   "sites": [
@@ -766,6 +766,351 @@
     "fee": 340,
     "serviceTip": 16,
     "overflowFinePerSec": 4
+   }
+  ]
+ },
+ {
+  "id": 10,
+  "title": "עיר המופעים: דרבי באצטדיון",
+  "dayLength": 260,
+  "coinTarget": 620,
+  "city": "city-shows",
+  "unlock": {
+   "kind": "equipment",
+   "name": "הופעה גדולה",
+   "desc": "הבא: הופעה גדולה בהיכל, כולם יוצאים ביחד בסוף",
+   "icon": "icon-star"
+  },
+  "gateWindows": [
+   [
+    125,
+    150
+   ],
+   [
+    215,
+    245
+   ]
+  ],
+  "sites": [
+   {
+    "id": "s1",
+    "type": "construction",
+    "name": "אתר בנייה - שכונת האצטדיון",
+    "spotId": "spot-build-a",
+    "openAt": 30,
+    "closeAt": 255,
+    "usage": [
+     [
+      0,
+      1.0
+     ],
+     [
+      80,
+      1.4
+     ],
+     [
+      160,
+      1.6
+     ],
+     [
+      210,
+      1.2
+     ]
+    ],
+    "fee": 170,
+    "serviceTip": 10,
+    "overflowFinePerSec": 1.5
+   },
+   {
+    "id": "s2",
+    "type": "show",
+    "name": "אצטדיון העיר - דרבי",
+    "spotId": "spot-stadium",
+    "openAt": 60,
+    "closeAt": 255,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      0.8
+     ],
+     [
+      65,
+      4.0
+     ],
+     [
+      85,
+      4.0
+     ],
+     [
+      90,
+      0.8
+     ],
+     [
+      150,
+      0.8
+     ],
+     [
+      155,
+      4.5
+     ],
+     [
+      180,
+      4.5
+     ],
+     [
+      185,
+      0.8
+     ]
+    ],
+    "fee": 300,
+    "serviceTip": 16,
+    "overflowFinePerSec": 4
+   }
+  ]
+ },
+ {
+  "id": 11,
+  "title": "הופעה גדולה בהיכל",
+  "dayLength": 270,
+  "coinTarget": 760,
+  "city": "city-shows",
+  "unlock": {
+   "kind": "equipment",
+   "name": "פסטיבל שלושה ימים",
+   "desc": "הבא: פסטיבל בפארק, שלושה גלי קהל",
+   "icon": "icon-star"
+  },
+  "gateWindows": [
+   [
+    210,
+    245
+   ]
+  ],
+  "sites": [
+   {
+    "id": "s3",
+    "type": "show",
+    "name": "פארק העיר - פיקניק",
+    "spotId": "spot-park",
+    "openAt": 30,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      100,
+      1.2
+     ],
+     [
+      200,
+      1.0
+     ]
+    ],
+    "fee": 160,
+    "serviceTip": 10,
+    "overflowFinePerSec": 2
+   },
+   {
+    "id": "s4",
+    "type": "show",
+    "name": "היכל המופעים - הופעה גדולה",
+    "spotId": "spot-arena",
+    "openAt": 90,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      20,
+      1.6
+     ],
+     [
+      115,
+      1.8
+     ],
+     [
+      120,
+      5.0
+     ],
+     [
+      150,
+      5.0
+     ],
+     [
+      155,
+      0.8
+     ]
+    ],
+    "fee": 340,
+    "serviceTip": 18,
+    "overflowFinePerSec": 4.5
+   }
+  ]
+ },
+ {
+  "id": 12,
+  "title": "פסטיבל שלושה ימים",
+  "dayLength": 280,
+  "coinTarget": 900,
+  "city": "city-shows",
+  "unlock": {
+   "kind": "city",
+   "name": "בקרוב",
+   "desc": "בקרוב: עוד עיר ועוד אירועים",
+   "icon": "icon-star"
+  },
+  "gateWindows": [
+   [
+    65,
+    90
+   ],
+   [
+    135,
+    160
+   ],
+   [
+    205,
+    235
+   ]
+  ],
+  "sites": [
+   {
+    "id": "s5",
+    "type": "show",
+    "name": "פארק העיר - פסטיבל",
+    "spotId": "spot-park",
+    "openAt": 20,
+    "closeAt": 275,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      40,
+      0.8
+     ],
+     [
+      45,
+      3.5
+     ],
+     [
+      70,
+      3.5
+     ],
+     [
+      75,
+      0.8
+     ],
+     [
+      110,
+      0.8
+     ],
+     [
+      115,
+      4.0
+     ],
+     [
+      140,
+      4.0
+     ],
+     [
+      145,
+      0.8
+     ],
+     [
+      180,
+      0.8
+     ],
+     [
+      185,
+      4.5
+     ],
+     [
+      215,
+      4.5
+     ],
+     [
+      220,
+      0.8
+     ]
+    ],
+    "fee": 320,
+    "serviceTip": 16,
+    "overflowFinePerSec": 4
+   },
+   {
+    "id": "s6",
+    "type": "show",
+    "name": "אצטדיון העיר - במת הפסטיבל",
+    "spotId": "spot-stadium",
+    "openAt": 50,
+    "closeAt": 275,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      10,
+      0.6
+     ],
+     [
+      15,
+      2.6
+     ],
+     [
+      40,
+      2.6
+     ],
+     [
+      45,
+      0.6
+     ],
+     [
+      80,
+      0.6
+     ],
+     [
+      85,
+      3.0
+     ],
+     [
+      110,
+      3.0
+     ],
+     [
+      115,
+      0.6
+     ],
+     [
+      150,
+      0.6
+     ],
+     [
+      155,
+      3.2
+     ],
+     [
+      185,
+      3.2
+     ],
+     [
+      190,
+      0.6
+     ]
+    ],
+    "fee": 280,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3.5
    }
   ]
  }

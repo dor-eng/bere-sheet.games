@@ -4,7 +4,7 @@
 
 // ---------- map (src/data/city1.json, owner: manager) ----------
 export interface MapNode { id: string; x: number; y: number }
-export interface MapEdge { a: string; b: string; kind: 'main' | 'street' | 'sand' | 'check' } // street, sand = slower; check = security checkpoint (slowest)
+export interface MapEdge { a: string; b: string; kind: 'main' | 'street' | 'sand' | 'check' | 'gate' } // street, sand = slower; check = security checkpoint (slowest); gate = crowd-flow gate (main speed, crawls inside LevelDef.gateWindows)
 export interface Decor { key: AssetKey; x: number; y: number; scale?: number } // static buildings/trees
 export interface SiteSpot { id: string; nodeId: string; x: number; y: number; slots: { x: number; y: number }[] } // cabin slot world positions
 export interface CityMap {
@@ -14,7 +14,7 @@ export interface CityMap {
 }
 
 // ---------- level data (src/data/levels.json + economy.json, owner: sim lane) ----------
-export type SiteType = 'construction' | 'wedding' | 'beach' | 'ceremony';
+export type SiteType = 'construction' | 'wedding' | 'beach' | 'ceremony' | 'show';
 export interface SiteDef {
   id: string; type: SiteType; name: string; // Hebrew display name
   spotId: string; // SiteSpot in the map
@@ -27,7 +27,8 @@ export interface SiteDef {
 export interface UnlockDef { kind: 'site' | 'equipment' | 'vehicle' | 'city' | 'mechanic'; name: string; desc: string; icon: AssetKey }
 export interface LevelDef {
   id: number; title: string; dayLength: number; // sim seconds
-  city?: string; // CityMap id ('city-beach' | 'city-capital'), default 'city-real'
+  city?: string; // CityMap id ('city-beach' | 'city-capital' | 'city-shows'), default 'city-real'
+  gateWindows?: [number, number][]; // sim-second [from, to) windows when 'gate' edges crawl (ECON.gateSpeedMult); none = gates are plain roads
   sites: SiteDef[];
   coinTarget: number; // 3rd star
   unlock: UnlockDef; // shown on this level's end card

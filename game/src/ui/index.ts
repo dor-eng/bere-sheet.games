@@ -17,7 +17,7 @@ const JOB: Record<TruckJob, [string, string]> = {
   idle: ['חונה', 's-idle'], toSite: ['בדרך', 's-go'], delivering: ['בדרך', 's-go'], toDepot: ['בדרך', 's-go'],
   pumping: ['שואב', 's-pump'], dumping: ['מרוקן', 's-dump'],
 };
-const SITE_ICON: Record<string, string> = { construction: '🏗️', wedding: '💒', beach: '🏖️', ceremony: '🇮🇱' };
+const SITE_ICON: Record<string, string> = { construction: '🏗️', wedding: '💒', beach: '🏖️', ceremony: '🇮🇱', show: '🎤' };
 const ICON: Record<string, string> = { site: '🏗️', equipment: '🧰', vehicle: '🚚', city: '🏙️', mechanic: '⚙️' };
 const el = (cls: string, tag = 'div') => { const e = document.createElement(tag); e.className = cls; return e; };
 const pct = (a: number, b: number) => Math.max(0, Math.min(100, Math.round((a / (b || 1)) * 100)));

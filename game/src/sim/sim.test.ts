@@ -4,8 +4,9 @@ import assert from 'node:assert/strict';
 import city1 from '../data/city1.json' with { type: 'json' };
 import cityBeach from '../data/city-beach.json' with { type: 'json' };
 import cityCapital from '../data/city-capital.json' with { type: 'json' };
+import cityShows from '../data/city-shows.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
-import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, LEVELS, UPGRADES, ECON } from './index.ts';
+import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, gateCrowded, LEVELS, UPGRADES, ECON } from './index.ts';
 
 const map = city1 as unknown as CityMap;
 const DT = 1 / 30;
@@ -220,7 +221,7 @@ test('economy: applyResult advances + keeps best stars, upgrades cost + cap', ()
   for (let i = 0; i < 3; i++) { const r = buyUpgrade(cur, 'pump'); assert.ok(r.ok); cur = r.save; }
   assert.equal(cur.upgrades.pump, 3); assert.equal(buyUpgrade(cur, 'pump').ok, false);
   for (const u of UPGRADES) { assert.equal(u.values.length, 4); assert.equal(u.costs.length, 3); }
-  assert.equal(LEVELS.length, 9);
+  assert.equal(LEVELS.length, 12);
   const s3 = createDay(LEVELS[0], map, cur);
   assert.equal(s3.trucks[0].pumpRate, 70);
 });
@@ -343,6 +344,91 @@ test('capital play: bot gets >=1 star on L7-L9', () => {
   const save: Save = { coins: 0, level: 7, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
   for (const l of LEVELS.filter((x) => x.city === 'city-capital')) {
     const r = dayResult(playBot(l, { ...save, level: l.id }, capital));
+    console.log('L' + l.id, JSON.stringify(r));
+    assert.ok(r.stars >= 1, 'L' + l.id);
+  }
+});
+
+// ---------- city 4 shows (step G3): crowd-flow gates, open only inside the level's gateWindows ----------
+const shows = cityShows as unknown as CityMap;
+const showsKinds = (p: string[]) => p.slice(1).map((n, i) => shows.edges.find((e) => (e.a === p[i] && e.b === n) || (e.b === p[i] && e.a === n))!.kind);
+/** Sim-level probe: one truck sent to deliver at the stadium at time t0; returns [arrival sec after dispatch, path]. */
+function gateTrip(windows: [number, number][] | undefined, t0: number) {
+  const lv: LevelDef = { ...LEVELS.find((l) => l.id === 10)!, gateWindows: windows };
+  const s = createDay(lv, shows, { coins: 0, level: 10, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 2 } });
+  run(s, t0);
+  const site = s.sites.find((x) => x.def.spotId === 'spot-stadium')!;
+  assert.ok(command(s, { type: 'deliver', truckId: 't1', siteId: site.def.id, count: 1 }).ok);
+  const path = [...s.trucks[0].path], start = s.time;
+  runUntil(s, () => s.cabins.some((c) => c.siteId === site.def.id));
+  return { sec: s.time - start, path };
+}
+test('shows: gateCrowded is [from, to) over the windows; none -> never', () => {
+  assert.equal(gateCrowded(undefined, 100), false);
+  assert.equal(gateCrowded([], 100), false);
+  assert.equal(gateCrowded([[10, 20], [50, 60]], 10), true);
+  assert.equal(gateCrowded([[10, 20], [50, 60]], 20), false);
+  assert.equal(gateCrowded([[10, 20], [50, 60]], 55), true);
+});
+test('shows: a gate edge is main speed outside a window, ECON.gateSpeedMult inside', () => {
+  const g: CityMap = { ...shows, nodes: [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 300, y: 0 }], edges: [{ a: 'a', b: 'b', kind: 'gate' }] };
+  const m: CityMap = { ...g, edges: [{ a: 'a', b: 'b', kind: 'main' }] };
+  assert.equal(pathTime(g, ['a', 'b'], 100), pathTime(m, ['a', 'b'], 100));
+  assert.ok(Math.abs(pathTime(g, ['a', 'b'], 100, true) - pathTime(m, ['a', 'b'], 100) / ECON.gateSpeedMult) < 1e-9);
+  assert.equal(pathTime(m, ['a', 'b'], 100, true), pathTime(m, ['a', 'b'], 100)); // only gate edges care
+});
+test('shows: depot->stadium uses a gate when open, the longer non-gate road while the crowd window is open', () => {
+  const free = route(shows, shows.depotNodeId, 'ST'), crowd = route(shows, shows.depotNodeId, 'ST', true);
+  assert.ok(showsKinds(free).includes('gate'), free.join());
+  assert.ok(!showsKinds(crowd).includes('gate'), crowd.join());
+  assert.ok(pathTime(shows, crowd, 110) > pathTime(shows, free, 110)); // detour is longer when gates are open
+  assert.ok(pathTime(shows, free, 110, true) > pathTime(shows, crowd, 110, true)); // but beats crawling through the crowd
+  const a1 = route(shows, shows.depotNodeId, 'AR'), a2 = route(shows, shows.depotNodeId, 'AR', true);
+  assert.ok(showsKinds(a1).includes('gate') && !showsKinds(a2).includes('gate'), a1.join() + ' / ' + a2.join());
+});
+test('shows sim: a truck dispatched inside a window reroutes and arrives later; no gateWindows -> old timing (negative control)', () => {
+  const base = gateTrip(undefined, 130); // L10 with the windows removed = plain roads
+  const open = gateTrip([[0, 1e9]], 130); // window covers the whole trip
+  const outside = gateTrip([[500, 600]], 130); // window exists but not now
+  assert.ok(showsKinds(base.path).includes('gate'), base.path.join());
+  assert.ok(!showsKinds(open.path).includes('gate'), open.path.join());
+  assert.ok(open.sec > base.sec + 3, `window ${open.sec} vs none ${base.sec}`);
+  assert.deepEqual(outside.path, base.path);
+  assert.equal(outside.sec, base.sec);
+  const expect = pathTime(shows, base.path, ECON.truck.speed);
+  assert.ok(Math.abs(base.sec - expect) <= DT * 2, `${base.sec} vs ${expect}`);
+});
+test('shows sim: a window opening mid-trip slows a truck already on a gate edge (movement sees sim time)', () => {
+  const free = gateTrip(undefined, 30);
+  const p = free.path, gi = showsKinds(p).indexOf('gate');
+  // open the window at the moment the truck reaches the gate edge: it keeps its path but crawls
+  const tGate = 30 + pathTime(shows, p.slice(0, gi + 1), ECON.truck.speed);
+  const slow = gateTrip([[tGate, 1e9]], 30);
+  assert.deepEqual(slow.path, p);
+  assert.ok(slow.sec > free.sec + 3, `${slow.sec} vs ${free.sec}`);
+});
+test('shows: levels 10-12 use the shows map with gate windows, every site spot reachable from the depot', () => {
+  const lv = LEVELS.filter((l) => l.city === 'city-shows');
+  assert.deepEqual(lv.map((l) => l.id), [10, 11, 12]);
+  assert.ok(shows.edges.filter((e) => e.kind === 'gate').length >= 4);
+  for (const l of lv) {
+    assert.ok(l.gateWindows && l.gateWindows.length >= 1, 'L' + l.id);
+    for (const [a, b] of l.gateWindows!) assert.ok(a < b && b <= l.dayLength, 'L' + l.id);
+    for (const st of l.sites) {
+      const spot = shows.spots.find((p) => p.id === st.spotId)!;
+      assert.ok(spot, st.spotId);
+      assert.ok(route(shows, shows.depotNodeId, spot.nodeId).length > 1, st.spotId);
+      assert.ok(route(shows, shows.depotNodeId, spot.nodeId, true).length > 1, st.spotId);
+    }
+  }
+  for (const l of LEVELS.filter((x) => x.id <= 9)) assert.equal(l.gateWindows, undefined, 'L' + l.id);
+});
+test('shows play: bot reaches day end with >=1 star on L10-L12', () => {
+  const save: Save = { coins: 0, level: 10, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
+  for (const l of LEVELS.filter((x) => x.city === 'city-shows')) {
+    const s = playBot(l, { ...save, level: l.id }, shows);
+    assert.ok(s.over, 'L' + l.id);
+    const r = dayResult(s);
     console.log('L' + l.id, JSON.stringify(r));
     assert.ok(r.stars >= 1, 'L' + l.id);
   }

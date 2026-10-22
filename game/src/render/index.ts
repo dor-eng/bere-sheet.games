@@ -6,7 +6,8 @@ import { art, loadAssets, loadReal, logo, personArt, realSprite, INK } from './a
 import { Camera, bindGestures } from './camera.ts';
 import { FxLayer } from './fx.ts';
 import { iso, isoRect, unIso, ISO_W, ISO_H } from './iso.ts';
-import { buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
+import { buildGates, buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
+import { gateCrowded } from '../sim/index.ts';
 
 const gaugeColor = (r: number) => (r < 0.6 ? 0x3dd68c : r < 0.85 ? 0xffb020 : 0xe5484d);
 const TRUCK_W = 280, CABIN_H = 56, PERSON_H = 36;
@@ -80,7 +81,7 @@ export interface RenderExtra {
 
 export function createRender(): RenderApi & RenderExtra {
   let app: Application, cam: Camera, map: CityMap;
-  let world: Container, actors: Container, padLayer: Container;
+  let world: Container, actors: Container, padLayer: Container, gates: Graphics;
   const fx = new FxLayer();
   const sel = new Graphics();
   let selected: Selection = null;
@@ -257,7 +258,8 @@ export function createRender(): RenderApi & RenderExtra {
       padLayer = new Container(); actors = new Container(); actors.sortableChildren = true;
       const st = buildStatic(map);
       for (const t of st.things) actors.addChild(t);
-      world.addChild(st.ground, padLayer, sel, actors, fx.layer);
+      gates = buildGates(map); gates.visible = false; // crowd-flow gate barriers: only while a gate window is open
+      world.addChild(st.ground, gates, padLayer, sel, actors, fx.layer);
       app.stage.addChild(world);
       cam = new Camera(world, ISO_W, ISO_H);
       cam.resize(el.clientWidth || app.screen.width, el.clientHeight || app.screen.height);
@@ -281,6 +283,7 @@ export function createRender(): RenderApi & RenderExtra {
         sv.pad.c.alpha = st.open ? 1 : st.closed ? 0.55 : 0.8;
         stepPeople(sv, s, dt, st.open);
       }
+      gates.visible = gateCrowded(s.level.gateWindows, s.time);
       if (s.time !== lastEventTime) { handleEvents(s); lastEventTime = s.time; } // re-called without a sim step => don't replay FX
       // cabins
       const seen = new Set<string>();
