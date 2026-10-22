@@ -1,0 +1,15 @@
+{
+  "cabinCapacity": 100,
+  "cabinCarry": 2,
+  "truck": { "name": "המשאית הישנה", "speed": 110 },
+  "streetSpeedMult": 0.7,
+  "dumpRate": 80,
+  "pumpMinFill": 25,
+  "feeOverflowTolerance": 12,
+  "starFractions": [0.5, 0.75, 1],
+  "upgrades": [
+    { "id": "pump", "name": "משאבה", "desc": "שואבת מהר יותר, פחות זמן בכל אתר", "costs": [70, 150, 280], "values": [20, 32, 48, 70] },
+    { "id": "tank", "name": "מיכל", "desc": "מיכל גדול יותר, יותר תאים בנסיעה אחת", "costs": [80, 160, 300], "values": [200, 300, 450, 650] },
+    { "id": "cabin", "name": "תאים", "desc": "עוד תאים במחסן לאתרים", "costs": [90, 180, 320], "values": [3, 4, 6, 8] }
+  ]
+}

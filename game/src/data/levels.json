@@ -1,0 +1,28 @@
+[
+  {
+    "id": 1, "title": "יום ראשון באתר", "dayLength": 200, "coinTarget": 300,
+    "unlock": {"kind": "equipment", "name": "נגרר שירותים יוקרתי", "desc": "הבא: נגרר יוקרה לחתונות, מוכן לאירוע הבא", "icon": "icon-luxury-trailer"},
+    "sites": [
+      {"id": "s1", "type": "construction", "name": "אתר בנייה צפון", "spotId": "spot-build-a", "openAt": 35, "closeAt": 195, "usage": [[0, 1.2], [60, 1.8], [120, 2.2], [160, 1.6]], "fee": 140, "serviceTip": 10, "overflowFinePerSec": 1.5},
+      {"id": "s2", "type": "wedding", "name": "אולם גן הרימונים", "spotId": "spot-hall-a", "openAt": 110, "closeAt": 195, "usage": [[0, 0.3], [15, 2.5], [45, 3.5], [85, 2.0]], "fee": 160, "serviceTip": 14, "overflowFinePerSec": 3}
+    ]
+  },
+  {
+    "id": 2, "title": "שני אתרי בנייה", "dayLength": 220, "coinTarget": 480,
+    "unlock": {"kind": "event", "name": "חתונת גן", "desc": "גלי טקס וארוחה, יחד עם עבודה שוטפת באתרי הבנייה", "icon": "icon-cabin"},
+    "sites": [
+      {"id": "s1", "type": "construction", "name": "אתר בנייה צפון", "spotId": "spot-build-a", "openAt": 35, "closeAt": 215, "usage": [[0, 1.09], [70, 1.56], [140, 1.87], [180, 1.4]], "fee": 150, "serviceTip": 10, "overflowFinePerSec": 1.5},
+      {"id": "s3", "type": "construction", "name": "אתר בנייה מרכז", "spotId": "spot-build-b", "openAt": 20, "closeAt": 215, "usage": [[0, 0.94], [80, 1.4], [150, 1.56], [195, 1.17]], "fee": 130, "serviceTip": 10, "overflowFinePerSec": 1.5},
+      {"id": "s2", "type": "wedding", "name": "אולם גן הרימונים", "spotId": "spot-hall-a", "openAt": 125, "closeAt": 215, "usage": [[0, 0.23], [15, 2.18], [50, 2.96], [90, 1.72]], "fee": 180, "serviceTip": 14, "overflowFinePerSec": 3}
+    ]
+  },
+  {
+    "id": 3, "title": "חתונה גדולה וגם בנייה", "dayLength": 240, "coinTarget": 480,
+    "unlock": {"kind": "equipment", "name": "שדרוג מכון הרחצה", "desc": "החזרת תאים מהירה יותר למחסן", "icon": "icon-pump"},
+    "sites": [
+      {"id": "s1", "type": "construction", "name": "אתר בנייה צפון", "spotId": "spot-build-a", "openAt": 35, "closeAt": 235, "usage": [[0, 0.9], [80, 1.32], [160, 1.56], [200, 1.2]], "fee": 160, "serviceTip": 10, "overflowFinePerSec": 1.5},
+      {"id": "s3", "type": "construction", "name": "אתר בנייה מרכז", "spotId": "spot-build-b", "openAt": 20, "closeAt": 235, "usage": [[0, 0.78], [90, 1.2], [170, 1.32], [215, 0.96]], "fee": 140, "serviceTip": 10, "overflowFinePerSec": 1.5},
+      {"id": "s2", "type": "wedding", "name": "אולם גן הרימונים - חתונה גדולה", "spotId": "spot-hall-a", "openAt": 130, "closeAt": 235, "usage": [[0, 0.24], [15, 2.1], [50, 3.0], [100, 1.8]], "fee": 300, "serviceTip": 16, "overflowFinePerSec": 4}
+    ]
+  }
+]
