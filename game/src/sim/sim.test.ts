@@ -471,7 +471,14 @@ test('industry sim: a truck dumps at a satellite dump nearer than the depot, par
   assert.ok(Math.abs(r.sec - expect) <= DT * 3, `${r.sec} vs ${expect}`);
   const base = dumpTrip(lineMap()); // negative control: no dumps -> depot, old timing
   assert.ok(r.sec < base.sec - 5, `${r.sec} vs depot ${base.sec}`);
-  // the truck parked at the dump can still be sent out; deliver keeps its rule (cabins from depot stock)
+  // parked at the dump: deliver refused (cabins load only at the depot), recall drives home (desk G4 r1)
+  assert.deepEqual(command(r.s, { type: 'deliver', truckId: 't1', siteId: 'x', count: 1 }), { ok: false, reason: 'כדי להעמיס תאים המשאית צריכה לחזור למחסן' });
+  const back = structuredClone(r.s);
+  assert.ok(command(back, { type: 'recall', truckId: 't1' }).ok);
+  assert.equal(back.trucks[0].job, 'toDepot');
+  assert.equal(back.trucks[0].path[back.trucks[0].path.length - 1], 'D');
+  assert.equal(command(back, { type: 'recall', truckId: 't1' }).ok, false); // already heading to the depot
+  // the truck parked at the dump can still be sent out to service
   assert.ok(command(r.s, { type: 'service', truckId: 't1', siteId: 'x' }).ok);
 });
 test('industry sim: no map.dumps (negative control) -> truck goes to the depot, old timing, cabins/tank as before', () => {

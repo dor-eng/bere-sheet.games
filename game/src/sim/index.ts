@@ -349,8 +349,9 @@ export function command(s: GameState, c: Command): CommandResult {
   const t = s.trucks.find((x) => x.id === c.truckId);
   if (!t) return no('המשאית לא נמצאה');
   if (c.type === 'recall') {
-    if (t.job === 'idle' || t.job === 'dumping') return no('המשאית כבר במחסן');
-    if (t.job === 'toDepot') return no('המשאית כבר חוזרת למחסן');
+    const home = t.path[t.path.length - 1] === s.map.depotNodeId; // false at / on the way to a satellite dump
+    if ((t.job === 'idle' || t.job === 'dumping') && home) return no('המשאית כבר במחסן');
+    if (t.job === 'toDepot' && home) return no('המשאית כבר חוזרת למחסן');
     t.job = 'toDepot';
     retarget(s, t, s.map.depotNodeId);
     if (t.path.length === 1) arrive(s, t);
@@ -368,7 +369,8 @@ export function command(s: GameState, c: Command): CommandResult {
     if (t.path.length === 1) t.job = 'pumping';
     return { ok: true };
   }
-  // deliver
+  // deliver: cabins load only at the depot (a truck parked at a satellite dump must come back first)
+  if (!atDepotIdle(s, t)) return no('כדי להעמיס תאים המשאית צריכה לחזור למחסן');
   const spot = spotOf(s, site);
   const free = spot.slots.length - cabinsAt(s, site.def.id).length;
   const avail = stock(s);
