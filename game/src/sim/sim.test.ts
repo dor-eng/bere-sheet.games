@@ -3,8 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import city1 from '../data/city1.json' with { type: 'json' };
 import cityBeach from '../data/city-beach.json' with { type: 'json' };
+import cityCapital from '../data/city-capital.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
-import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, LEVELS, UPGRADES } from './index.ts';
+import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, LEVELS, UPGRADES, ECON } from './index.ts';
 
 const map = city1 as unknown as CityMap;
 const DT = 1 / 30;
@@ -219,7 +220,7 @@ test('economy: applyResult advances + keeps best stars, upgrades cost + cap', ()
   for (let i = 0; i < 3; i++) { const r = buyUpgrade(cur, 'pump'); assert.ok(r.ok); cur = r.save; }
   assert.equal(cur.upgrades.pump, 3); assert.equal(buyUpgrade(cur, 'pump').ok, false);
   for (const u of UPGRADES) { assert.equal(u.values.length, 4); assert.equal(u.costs.length, 3); }
-  assert.equal(LEVELS.length, 6);
+  assert.equal(LEVELS.length, 9);
   const s3 = createDay(LEVELS[0], map, cur);
   assert.equal(s3.trucks[0].pumpRate, 70);
 });
@@ -285,8 +286,49 @@ test('beach: levels 4-6 use the beach map, every site spot reachable from the de
 });
 test('beach play: bot gets >=1 star on L4-L6', () => {
   const save: Save = { coins: 0, level: 4, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
-  for (const l of LEVELS.slice(3)) {
+  for (const l of LEVELS.filter((x) => x.city === 'city-beach')) {
     const r = dayResult(playBot(l, { ...save, level: l.id }, beach));
+    console.log('L' + l.id, JSON.stringify(r));
+    assert.ok(r.stars >= 1, 'L' + l.id);
+  }
+});
+
+// ---------- city 3 capital (step G2): security checkpoints ----------
+const capital = cityCapital as unknown as CityMap;
+const line = (kind: 'main' | 'check'): CityMap => ({ ...capital, nodes: [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 300, y: 0 }], edges: [{ a: 'a', b: 'b', kind }] });
+test('capital: a checkpoint edge is slower than main of the same length; mult=1 -> equal (negative control)', () => {
+  const chk = pathTime(line('check'), ['a', 'b'], 100), main = pathTime(line('main'), ['a', 'b'], 100);
+  assert.ok(chk > main * 2, `check ${chk} vs main ${main}`);
+  const keep = ECON.checkSpeedMult;
+  try {
+    ECON.checkSpeedMult = 1;
+    assert.equal(pathTime(line('check'), ['a', 'b'], 100), main);
+  } finally { ECON.checkSpeedMult = keep; }
+});
+test('capital: depot->rally square detours via stone streets around the checkpoint (longer, faster)', () => {
+  const kinds = (p: string[]) => p.slice(1).map((n, i) => capital.edges.find((e) => (e.a === p[i] && e.b === n) || (e.b === p[i] && e.a === n))!.kind);
+  const len = (p: string[]) => p.slice(1).reduce((t, n, i) => { const a = capital.nodes.find((x) => x.id === p[i])!, b = capital.nodes.find((x) => x.id === n)!; return t + Math.hypot(b.x - a.x, b.y - a.y); }, 0);
+  assert.equal(capital.edges.filter((e) => e.kind === 'check').length, 4);
+  const p = route(capital, capital.depotNodeId, 'Q2');
+  assert.ok(!kinds(p).includes('check'), p.join());
+  const viaCheck = [capital.depotNodeId, 'R6', 'S3', 'R5', 'Q2'];
+  assert.ok(kinds(viaCheck).includes('check'));
+  assert.ok(len(p) > len(viaCheck) && pathTime(capital, p, 100) < pathTime(capital, viaCheck, 100));
+  assert.ok(kinds(route(capital, 'R0', 'Q1')).includes('check')); // sometimes the checkpoint is still the fastest
+});
+test('capital: levels 7-9 use the capital map, every site spot reachable from the depot', () => {
+  const lv = LEVELS.filter((l) => l.city === 'city-capital');
+  assert.deepEqual(lv.map((l) => l.id), [7, 8, 9]);
+  for (const l of lv) for (const st of l.sites) {
+    const spot = capital.spots.find((p) => p.id === st.spotId)!;
+    assert.ok(spot, st.spotId);
+    assert.ok(route(capital, capital.depotNodeId, spot.nodeId).length > 1, st.spotId);
+  }
+});
+test('capital play: bot gets >=1 star on L7-L9', () => {
+  const save: Save = { coins: 0, level: 7, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
+  for (const l of LEVELS.filter((x) => x.city === 'city-capital')) {
+    const r = dayResult(playBot(l, { ...save, level: l.id }, capital));
     console.log('L' + l.id, JSON.stringify(r));
     assert.ok(r.stars >= 1, 'L' + l.id);
   }

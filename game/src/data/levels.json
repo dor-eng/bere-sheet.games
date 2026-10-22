@@ -426,9 +426,9 @@
   "coinTarget": 700,
   "city": "city-beach",
   "unlock": {
-   "kind": "equipment",
+   "kind": "city",
    "name": "עיר הבירה",
-   "desc": "בקרוב: העיר הבאה",
+   "desc": "הבא: עיר הבירה. מחסומי ביטחון מאטים משאיות",
    "icon": "icon-star"
   },
   "sites": [
@@ -518,6 +518,254 @@
     "fee": 320,
     "serviceTip": 16,
     "overflowFinePerSec": 3.5
+   }
+  ]
+ },
+ {
+  "id": 7,
+  "title": "עיר הבירה: הפגנה בכיכר",
+  "dayLength": 250,
+  "coinTarget": 520,
+  "city": "city-capital",
+  "unlock": {
+   "kind": "equipment",
+   "name": "טקס ממלכתי",
+   "desc": "הבא: טקס ממלכתי ברובע הממשלה",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s1",
+    "type": "construction",
+    "name": "אתר בנייה - העיר העתיקה",
+    "spotId": "spot-build-a",
+    "openAt": 30,
+    "closeAt": 245,
+    "usage": [
+     [
+      0,
+      1.0
+     ],
+     [
+      80,
+      1.4
+     ],
+     [
+      160,
+      1.6
+     ],
+     [
+      210,
+      1.2
+     ]
+    ],
+    "fee": 170,
+    "serviceTip": 10,
+    "overflowFinePerSec": 1.5
+   },
+   {
+    "id": "s2",
+    "type": "ceremony",
+    "name": "כיכר העם - הפגנה",
+    "spotId": "spot-rally",
+    "openAt": 70,
+    "closeAt": 245,
+    "usage": [
+     [
+      0,
+      0.5
+     ],
+     [
+      30,
+      2.2
+     ],
+     [
+      90,
+      2.8
+     ],
+     [
+      150,
+      1.4
+     ]
+    ],
+    "fee": 240,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3.5
+   }
+  ]
+ },
+ {
+  "id": 8,
+  "title": "טקס ממלכתי",
+  "dayLength": 260,
+  "coinTarget": 640,
+  "city": "city-capital",
+  "unlock": {
+   "kind": "equipment",
+   "name": "מרתון העיר",
+   "desc": "הבא: מרתון, טקס ובנייה ביחד",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s1",
+    "type": "construction",
+    "name": "אתר בנייה - העיר העתיקה",
+    "spotId": "spot-build-a",
+    "openAt": 30,
+    "closeAt": 255,
+    "usage": [
+     [
+      0,
+      1.0
+     ],
+     [
+      80,
+      1.4
+     ],
+     [
+      160,
+      1.6
+     ],
+     [
+      210,
+      1.2
+     ]
+    ],
+    "fee": 170,
+    "serviceTip": 10,
+    "overflowFinePerSec": 1.5
+   },
+   {
+    "id": "s3",
+    "type": "ceremony",
+    "name": "רחבת הממשלה - טקס ממלכתי",
+    "spotId": "spot-ceremony",
+    "openAt": 110,
+    "closeAt": 255,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      20,
+      2.6
+     ],
+     [
+      70,
+      3.2
+     ],
+     [
+      120,
+      1.8
+     ]
+    ],
+    "fee": 340,
+    "serviceTip": 16,
+    "overflowFinePerSec": 4
+   }
+  ]
+ },
+ {
+  "id": 9,
+  "title": "מרתון וגם טקס",
+  "dayLength": 270,
+  "coinTarget": 960,
+  "city": "city-capital",
+  "unlock": {
+   "kind": "city",
+   "name": "עיר המופעים",
+   "desc": "בקרוב: העיר הבאה",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s4",
+    "type": "ceremony",
+    "name": "מרתון העיר - נקודת ריענון",
+    "spotId": "spot-marathon",
+    "openAt": 25,
+    "closeAt": 200,
+    "usage": [
+     [
+      0,
+      1.6
+     ],
+     [
+      40,
+      2.6
+     ],
+     [
+      110,
+      2.0
+     ],
+     [
+      160,
+      1.0
+     ]
+    ],
+    "fee": 260,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3.5
+   },
+   {
+    "id": "s2",
+    "type": "ceremony",
+    "name": "כיכר העם - עצרת",
+    "spotId": "spot-rally",
+    "openAt": 80,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.5
+     ],
+     [
+      30,
+      2.0
+     ],
+     [
+      90,
+      2.6
+     ],
+     [
+      150,
+      1.4
+     ]
+    ],
+    "fee": 240,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3.5
+   },
+   {
+    "id": "s3",
+    "type": "ceremony",
+    "name": "רחבת הממשלה - טקס ממלכתי",
+    "spotId": "spot-ceremony",
+    "openAt": 140,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      20,
+      2.6
+     ],
+     [
+      70,
+      3.2
+     ],
+     [
+      110,
+      1.8
+     ]
+    ],
+    "fee": 340,
+    "serviceTip": 16,
+    "overflowFinePerSec": 4
    }
   ]
  }

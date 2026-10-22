@@ -8,7 +8,7 @@ export const GROUND = 0xc4b89c;
 /** Fallback: draw the procedural ground/roads over the painted background (if its painted roads drift from the graph). */
 export const DRAW_ROADS = false;
 let bgKey: RealKey = 'bg'; // painted background of the mounted city (set by buildStatic)
-const ROAD_W = { main: 64, street: 42, sand: 36 } as const;
+const ROAD_W = { main: 64, street: 42, sand: 36, check: 64 } as const;
 
 function drawRoads(g: Graphics, map: CityMap) {
   g.poly(isoRect(0, 0, map.width, map.height)).fill({ color: 0x9fb98a });
@@ -25,7 +25,7 @@ function drawRoads(g: Graphics, map: CityMap) {
   };
   const dn = node.get(map.depotNodeId)!;
   g.poly(seg(map.depot.x, map.depot.y, dn.x, dn.y, 26)).fill({ color: 0x55606c });
-  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.poly(seg(a.x, a.y, b.x, b.y, ROAD_W[e.kind])).fill({ color: e.kind === 'main' ? 0x3e434a : e.kind === 'sand' ? 0xd8bf8a : 0x4d535b }); }
+  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.poly(seg(a.x, a.y, b.x, b.y, ROAD_W[e.kind])).fill({ color: e.kind === 'main' ? 0x3e434a : e.kind === 'sand' ? 0xd8bf8a : e.kind === 'check' ? 0x5a4a4a : 0x4d535b }); }
   for (const e of map.edges) {
     if (e.kind !== 'main') continue;
     const a = node.get(e.a)!, b = node.get(e.b)!;
@@ -33,6 +33,15 @@ function drawRoads(g: Graphics, map: CityMap) {
     for (let d = 30; d + 26 < len - 30; d += 48) {
       const p = iso(a.x + ux * d, a.y + uy * d), q = iso(a.x + ux * (d + 26), a.y + uy * (d + 26));
       g.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 3, color: 0xe8e4d8, alpha: 0.8 });
+    }
+  }
+  for (const e of map.edges) { // security checkpoint: red-white barrier stripes along the whole edge
+    if (e.kind !== 'check') continue;
+    const a = node.get(e.a)!, b = node.get(e.b)!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    for (let d = 20, k = 0; d + 22 < len - 20; d += 22, k++) {
+      const p = iso(a.x + ux * d, a.y + uy * d), q = iso(a.x + ux * (d + 22), a.y + uy * (d + 22));
+      g.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 14, color: k % 2 ? 0xffffff : 0xd32f2f });
     }
   }
 }
