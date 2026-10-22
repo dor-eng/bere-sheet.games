@@ -22,8 +22,8 @@ const level2: LevelDef = { ...level, id: 2, title: 'שוק הכרמל', unlock: 
 const save: Save = { coins: 260, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0 } };
 
 const cabins: Cabin[] = [];
-level.sites.forEach((s, si) => [0.15, 0.55, 0.82, 0.97].slice(0, si ? 3 : 4).forEach((f, i) => cabins.push({ id: `c${si}${i}`, siteId: s.id, slot: i, fill: f * 100, capacity: 100 })));
-cabins.push({ id: 'c90', siteId: null, slot: 0, fill: 0, capacity: 100 }, { id: 'c91', siteId: null, slot: 1, fill: 0, capacity: 100 });
+level.sites.forEach((s, si) => [0.15, 0.55, 0.82, 0.97].slice(0, si ? 3 : 4).forEach((f, i) => cabins.push({ id: `c${si}${i}`, siteId: s.id, slot: i, fill: f * 100, capacity: 100, washT: 0 })));
+cabins.push({ id: 'c90', siteId: null, slot: 0, fill: 0, capacity: 100, washT: 0 }, { id: 'c91', siteId: null, slot: 1, fill: 0, capacity: 100, washT: 0 });
 const state: GameState = {
   level, map, time: 96, over: false, coinsStart: 120, coins: 184,
   trucks: [{ id: 't1', name: 'הוותיקה', job: 'toSite', path: [], seg: 0, segT: 0, x: 300, y: 600, angle: 0, tank: 90, tankCap: 200, pumpRate: 10, speed: 80, targetSiteId: 's1', carrying: 0 }],

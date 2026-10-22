@@ -231,3 +231,38 @@ test('L2/L3 play: bot completes and levels are tuned reachable', () => {
   console.log('L3', JSON.stringify(r3));
   assert.ok(r2.stars >= 1 && r3.stars >= 1);
 });
+
+// ---------- wash center (step F) ----------
+const ECONW = { sec: 25, bays: 1 }; // mirrors economy.json wash
+function washDay() {
+  const s = createDay(LEVELS[1], map, { coins: 0, level: 2, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 1 } });
+  // 2 cabins on the short job s3 (closes at 110), the rest on s1: depot is empty
+  s.cabins.forEach((c, i) => { c.siteId = i < 2 ? 's3' : 's1'; c.slot = i < 2 ? i : i - 2; });
+  return s;
+}
+
+test('wash: cabins from a closed site come back dirty and cannot be delivered', () => {
+  const s = washDay();
+  run(s, 110.5);
+  const back = s.cabins.filter((c) => c.siteId === null);
+  assert.equal(back.length, 2);
+  assert.ok(back.every((c) => c.washT > 0));
+  const r = command(s, { type: 'deliver', truckId: 't1', siteId: 's2', count: 1 });
+  assert.equal(r.ok, false);
+});
+
+test('wash: one bay washes one cabin at a time, then it can be delivered', () => {
+  const s = washDay();
+  run(s, 110 + ECONW.sec + 0.5);
+  assert.deepEqual(s.cabins.filter((c) => c.siteId === null).map((c) => c.washT === 0), [true, false]);
+  assert.equal(command(s, { type: 'deliver', truckId: 't1', siteId: 's2', count: 2 }).ok, true);
+  assert.equal(s.trucks[0].carrying, 1); // only the clean one is loaded
+});
+
+test('wash: washed event fires per cabin; both clean after two cycles', () => {
+  const s = washDay();
+  let washed = 0;
+  for (let i = 0; i < Math.round((110 + 2 * ECONW.sec + 1) / DT) && !s.over; i++) { step(s, DT); washed += s.events.filter((e) => e.kind === 'washed').length; }
+  assert.equal(washed, 2);
+  assert.ok(s.cabins.filter((c) => c.siteId === null).every((c) => c.washT === 0));
+});

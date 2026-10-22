@@ -11,7 +11,7 @@ const mkSite = (id: string, type: 'construction' | 'wedding', spotId: string) =>
   return { def: { id, type, name: id, spotId, openAt: 0, closeAt: 999, usage, fee: 100, serviceTip: 5, overflowFinePerSec: 1 }, open: true, closed: false, overflowSec: 0, earned: 0, x: sp.x, y: sp.y };
 };
 const sites = [mkSite('A', 'construction', 'spot-build-a'), mkSite('B', 'wedding', 'spot-hall-a')];
-const cabins = sites.flatMap((st, si) => map.spots.find((s) => s.id === st.def.spotId)!.slots.slice(0, 3 + si * 2).map((_, k) => ({ id: `c${si}${k}`, siteId: st.def.id, slot: k, fill: 0, capacity: 100 })));
+const cabins = sites.flatMap((st, si) => map.spots.find((s) => s.id === st.def.spotId)!.slots.slice(0, 3 + si * 2).map((_, k) => ({ id: `c${si}${k}`, siteId: st.def.id, slot: k, fill: 0, capacity: 100, washT: 0 })));
 const mkTruck = (id: string): Truck => ({ id, name: id, job: 'toSite', path: [], seg: 0, segT: 0, x: 0, y: 0, angle: 0, tank: 0, tankCap: 100, pumpRate: 10, speed: 100, targetSiteId: null, carrying: 0 });
 const state: GameState = {
   level: { id: 1, title: 'dev', dayLength: 600, sites: [], coinTarget: 0, unlock: { kind: 'site', name: '', desc: '', icon: 'icon-coin' } },

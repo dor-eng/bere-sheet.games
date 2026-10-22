@@ -46,7 +46,7 @@ export interface Truck {
   tank: number; tankCap: number; pumpRate: number; speed: number; // liters, L/s, px/s
   targetSiteId: string | null; carrying: number; // cabins on board
 }
-export interface Cabin { id: string; siteId: string | null; slot: number; fill: number; capacity: number } // siteId null = in depot stock
+export interface Cabin { id: string; siteId: string | null; slot: number; fill: number; capacity: number; washT: number } // siteId null = in depot stock; washT > 0 = dirty, seconds of washing left
 export interface SiteState { def: SiteDef; open: boolean; closed: boolean; overflowSec: number; earned: number; x: number; y: number }
 export type GameEvent =
   | { kind: 'siteOpen' | 'siteClose' | 'overflowStart' | 'overflowEnd'; siteId: string }
@@ -54,6 +54,7 @@ export type GameEvent =
   | { kind: 'delivered'; siteId: string; count: number }
   | { kind: 'paid'; siteId: string; amount: number }
   | { kind: 'fine'; siteId: string; amount: number }
+  | { kind: 'washed'; cabinId: string }
   | { kind: 'dayEnd' };
 export interface GameState {
   level: LevelDef; map: CityMap; time: number; over: boolean;

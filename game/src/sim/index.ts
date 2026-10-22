@@ -12,7 +12,7 @@ export const LEVELS = levelsJson as unknown as LevelDef[];
 export const ECON = economyJson as unknown as {
   cabinCapacity: number; cabinCarry: number; truck: { name: string; speed: number };
   streetSpeedMult: number; dumpRate: number; pumpMinFill: number; feeOverflowTolerance: number;
-  starFractions: number[]; upgrades: UpgradeDef[];
+  starFractions: number[]; upgrades: UpgradeDef[]; wash: { sec: number; bays: number };
 };
 export const UPGRADES: UpgradeDef[] = ECON.upgrades;
 
@@ -75,7 +75,8 @@ export function pathTime(map: CityMap, path: string[], speed: number): number {
 // ---------- helpers ----------
 const siteOf = (s: GameState, id: string) => s.sites.find((x) => x.def.id === id);
 const cabinsAt = (s: GameState, siteId: string) => s.cabins.filter((c) => c.siteId === siteId);
-const stock = (s: GameState) => s.cabins.filter((c) => c.siteId === null && c.slot === STOCK_SLOT);
+const inDepot = (s: GameState) => s.cabins.filter((c) => c.siteId === null && c.slot === STOCK_SLOT);
+const stock = (s: GameState) => inDepot(s).filter((c) => c.washT <= 0); // clean, ready to deliver
 const boardSlot = (s: GameState, t: Truck) => -100 - s.trucks.indexOf(t);
 const spotOf = (s: GameState, site: SiteState) => s.map.spots.find((p) => p.id === site.def.spotId)!;
 const overflowFlags = new WeakMap<SiteState, boolean>();
@@ -133,7 +134,7 @@ export function createDay(level: LevelDef, map: CityMap, save: Save): GameState 
   };
   const cabins: Cabin[] = [];
   for (let i = 0; i < cabinCount; i++) {
-    cabins.push({ id: `c${i + 1}`, siteId: null, slot: STOCK_SLOT, fill: 0, capacity: ECON.cabinCapacity });
+    cabins.push({ id: `c${i + 1}`, siteId: null, slot: STOCK_SLOT, fill: 0, capacity: ECON.cabinCapacity, washT: 0 });
   }
   const sites: SiteState[] = level.sites.map((def) => {
     const spot = map.spots.find((p) => p.id === def.spotId)!;
@@ -166,7 +167,18 @@ function closeSite(s: GameState, site: SiteState) {
     site.earned += site.def.fee; addCoins(s, site.def.fee);
     s.events.push({ kind: 'paid', siteId: site.def.id, amount: site.def.fee });
   }
-  for (const c of cabinsAt(s, site.def.id)) { c.siteId = null; c.slot = STOCK_SLOT; c.fill = 0; }
+  // ponytail: cabins are hauled back instantly; a pickup trip is a later mechanic
+  for (const c of cabinsAt(s, site.def.id)) { c.siteId = null; c.slot = STOCK_SLOT; c.fill = 0; c.washT = ECON.wash.sec; }
+}
+
+/** Wash center: the first `bays` dirty cabins in the depot wash in parallel. */
+function stepWash(s: GameState, dt: number) {
+  let bays = ECON.wash.bays;
+  for (const c of inDepot(s)) {
+    if (c.washT <= 0 || bays-- <= 0) continue;
+    c.washT -= dt;
+    if (c.washT <= EPS) { c.washT = 0; s.events.push({ kind: 'washed', cabinId: c.id }); }
+  }
 }
 
 // ---------- step ----------
@@ -184,6 +196,7 @@ export function step(s: GameState, dt: number): void {
 
   for (const site of s.sites) if (site.open) stepSite(s, site, dt);
   for (const t of s.trucks) stepTruck(s, t, dt);
+  stepWash(s, dt);
 
   if (s.time >= s.level.dayLength) {
     for (const site of s.sites) if (!site.closed) closeSite(s, site);
