@@ -3,10 +3,10 @@ import type { GameState, GameEvent, Save, CityMap } from './sim/types.ts';
 import { createDay, step, command, dayResult, applyResult, buyUpgrade, LEVELS, newSave } from './sim/index.ts';
 import { createRender } from './render/index.ts';
 import { createUi } from './ui/index.ts';
-import city1 from './data/city1.json';
+import cityReal from './data/city-real.json';
 
 const KEY = 'bereshit.save.v1';
-const map = city1 as CityMap;
+const map = cityReal as CityMap;
 let save: Save = JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? newSave();
 const persist = () => localStorage.setItem(KEY, JSON.stringify(save));
 const level = () => LEVELS[Math.min(save.level, LEVELS.length) - 1];

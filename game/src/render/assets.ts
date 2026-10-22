@@ -150,24 +150,23 @@ export function personArt(kind: 'worker' | 'guest', i: number): Container {
 
 // ---- photoreal iso sprites (assets/real/*.png). Missing file -> null, caller falls back. ----
 export type RealKey = 'bg' | 'truck-dl' | 'truck-dr' | 'truck-ul' | 'truck-ur' | 'cabin' | 'worker' | 'guest'
-  | 'prop-construction' | 'prop-wedding' | 'prop-depot';
-const REAL: RealKey[] = ['bg', 'truck-dl', 'truck-dr', 'truck-ul', 'truck-ur', 'cabin', 'worker', 'guest', 'prop-construction', 'prop-wedding', 'prop-depot'];
+  | 'prop-wedding' | 'prop-depot';
+const REAL: RealKey[] = ['bg', 'truck-dl', 'truck-dr', 'truck-ul', 'truck-ur', 'cabin', 'worker', 'guest', 'prop-wedding', 'prop-depot'];
 const real = new Map<RealKey, Texture>();
 
 export async function loadReal(): Promise<void> {
   const base = import.meta.env.BASE_URL + 'assets/real/';
   await Promise.all(REAL.map(async (k) => {
-    const url = base + k + '.png';
+    const url = base + k + (k === 'bg' ? '.jpg' : '.png');
     try {
-      if (k.startsWith('prop-')) { // optional: probe first so a missing prop is silent (dev server answers 200 text/html)
-        const r = await fetch(url, { method: 'HEAD' });
-        if (!r.ok || !(r.headers.get('content-type') ?? 'image').startsWith('image')) return;
-      }
       real.set(k, await Assets.load<Texture>(url));
     } catch { /* missing: fallback art */ }
   }));
 }
 export const realTex = (k: RealKey) => real.get(k);
+
+/** Bereshit brand mark (navy), width w, centered. */
+export const logo = (w: number) => spriteOf('logo-navy', { w });
 
 /** Sprite scaled so its height (or width) hits the target, anchored at (ax, ay). */
 export function realSprite(k: RealKey, ax: number, ay: number, size: { w?: number; h?: number }): Sprite | null {

@@ -40,7 +40,7 @@ function drawRoads(g: Graphics, map: CityMap) {
 export function buildStatic(map: CityMap): { ground: Container; things: Container[] } {
   const ground = new Container();
   const t = realTex('bg');
-  if (t) { const bg = new Sprite(t); bg.width = ISO_W; bg.height = ISO_H; ground.addChild(bg); } // any pixel size, stretched
+  if (t) { const bg = new Sprite(t); bg.width = ISO_W; bg.height = ISO_H; bg.tint = 0xd9d9d9; ground.addChild(bg); } // any pixel size, stretched; dimmed ~15% so actors pop
   else { const g = new Graphics(); g.rect(0, 0, ISO_W, ISO_H).fill({ color: GROUND }); ground.addChild(g); }
   if (DRAW_ROADS || !t) { const g = new Graphics(); drawRoads(g, map); ground.addChild(g); }
 
@@ -70,7 +70,7 @@ export function buildPad(spot: SiteSpot, type: SiteType, node?: { x: number; y: 
     g.poly(isoRect(Math.min(spot.x, node.x) - hw, Math.min(spot.y, node.y) - hw, Math.max(spot.x, node.x) + hw, Math.max(spot.y, node.y) + hw)).fill({ color: 0x55606c });
   }
   const con = type === 'construction';
-  g.poly(isoRect(x0, y0, x1, y1)).fill({ color: con ? 0xb7956a : 0xcfe8a8, alpha: con ? 0.55 : 0.45 }).stroke({ width: 3, color: con ? 0x6b5233 : 0xffffff, alpha: 0.7 });
+  g.poly(isoRect(x0, y0, x1, y1)).fill({ color: con ? 0xb7956a : 0xcfe8a8, alpha: con ? 0.25 : 0.35 }).stroke({ width: 3, color: con ? 0x6b5233 : 0xffffff, alpha: 0.7 });
   // border dots: hazard (construction) / bunting (wedding), projected along the rect edges
   const per = 2 * (w + h), step = 26;
   for (let d = 0; d < per; d += step) {
@@ -81,9 +81,11 @@ export function buildPad(spot: SiteSpot, type: SiteType, node?: { x: number; y: 
     else g.ellipse(p.x, p.y, 5, 3).fill({ color: [0xf48fb1, 0xffffff, 0x7fd0ff][(d / step) % 3 | 0] });
   }
   const back = iso(cx, y0 + 50);
-  const prop = realSprite(con ? 'prop-construction' : 'prop-wedding', 0.5, 0.85, { w: 200 });
+  const painted = !!realTex('bg'); // construction lots are painted into the background
+  const prop = con ? null : realSprite('prop-wedding', 0.5, 0.85, { w: 200 });
   if (prop) { prop.position.set(back.x, back.y); c.addChild(prop); }
   else if (con) {
+    if (painted) return { c, w, h, cx, cy, x0, y0, x1, y1 };
     const cp = iso(x1 - 28, y0 + 70); const crane = art('crane'); crane.position.set(cp.x, cp.y); c.addChild(crane);
   } else {
     const ap = iso(spot.x, y0 + 80); const arch = art('wedding-arch'); arch.position.set(ap.x, ap.y); c.addChild(arch);

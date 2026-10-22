@@ -2,14 +2,14 @@
 // Sim is in world px (1000 x 1600); everything drawn goes through iso() into the 2600 x 1733 projected canvas.
 import { Application, Container, Graphics, Sprite } from 'pixi.js';
 import type { CityMap, GameState, RenderApi, Selection, SiteDef, SiteSpot, Truck } from '../sim/types.ts';
-import { art, loadAssets, loadReal, personArt, realSprite, INK } from './assets.ts';
+import { art, loadAssets, loadReal, logo, personArt, realSprite, INK } from './assets.ts';
 import { Camera, bindGestures } from './camera.ts';
 import { FxLayer } from './fx.ts';
 import { iso, isoRect, unIso, ISO_W, ISO_H } from './iso.ts';
 import { buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
 
 const gaugeColor = (r: number) => (r < 0.6 ? 0x3dd68c : r < 0.85 ? 0xffb020 : 0xe5484d);
-const TRUCK_W = 125, CABIN_H = 40, PERSON_H = 28;
+const TRUCK_W = 150, CABIN_H = 56, PERSON_H = 36;
 
 /** soft contact shadow: stacked translucent ellipses, light from screen upper-left -> offset lower-right */
 function shadow(rx: number, ry: number): Graphics {
@@ -24,7 +24,9 @@ function makeCabin(): CabinView {
   const c = new Container();
   const ring = new Graphics(); ring.ellipse(0, 0, 26, 13).fill({ color: 0xe5484d, alpha: 0.3 }).stroke({ width: 5, color: 0xe5484d });
   ring.visible = false;
-  c.addChild(ring, shadow(18, 8), realSprite('cabin', 0.5, 0.97, { h: CABIN_H }) ?? art('cabin', 0.8));
+  const spr = realSprite('cabin', 0.5, 0.97, { h: CABIN_H });
+  c.addChild(ring, shadow(18, 8), spr ?? art('cabin', 0.8));
+  const mark = spr && logo(15); if (mark) { mark.position.set(-8, -25); c.addChild(mark); } // brand on the cream door
   const gauge = new Graphics(); c.addChild(gauge);
   return { c, gauge, ring, q: -1 };
 }
@@ -43,8 +45,10 @@ function drawCabinGauge(g: Graphics, ratio: number) {
 // ---- truck view: 4 diagonal sprites, one visible ----
 type Dir = 'dl' | 'dr' | 'ul' | 'ur';
 const ANCHOR: Record<Dir, [number, number]> = { dr: [0.45, 0.68], ul: [0.47, 0.66], dl: [0.55, 0.68], ur: [0.53, 0.66] };
+/** Tank centre per view, relative to the anchor (screen px at TRUCK_W). */
+const LOGO_AT: Record<Dir, [number, number]> = { dr: [-17, -40], dl: [17, -40], ul: [6, -29], ur: [-6, -29] };
 interface TruckView {
-  c: Container; body: Container; views: Partial<Record<Dir, Sprite>>; gauge: Graphics; topY: number;
+  c: Container; body: Container; views: Partial<Record<Dir, Container>>; gauge: Graphics; topY: number;
   x: number; y: number; a: number; px: number; py: number; dir: Dir; job: string; q: number; spd: number; dustT: number;
 }
 /** world heading -> screen diagonal: +x DR, -x UL, +y DL, -y UR */
@@ -170,7 +174,11 @@ export function createRender(): RenderApi & RenderExtra {
     let topY = -70;
     for (const d of ['dl', 'dr', 'ul', 'ur'] as Dir[]) {
       const s = realSprite(`truck-${d}`, ANCHOR[d][0], ANCHOR[d][1], { w: TRUCK_W });
-      if (s) { s.visible = false; views[d] = s; body.addChild(s); topY = Math.min(topY, -s.height * ANCHOR[d][1]); }
+      if (s) {
+        const v = new Container(); v.visible = false; v.addChild(s);
+        const mark = logo(36); if (mark) { mark.position.set(...LOGO_AT[d]); v.addChild(mark); } // brand on the tank
+        views[d] = v; body.addChild(v); topY = Math.min(topY, -s.height * ANCHOR[d][1]);
+      }
     }
     if (!Object.keys(views).length) body.addChild(art('truck', 0.85)); // placeholder, no sprites
     const gauge = new Graphics(); gauge.position.set(0, topY - 18);
