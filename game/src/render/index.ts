@@ -9,7 +9,7 @@ import { iso, isoRect, unIso, ISO_W, ISO_H } from './iso.ts';
 import { buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
 
 const gaugeColor = (r: number) => (r < 0.6 ? 0x3dd68c : r < 0.85 ? 0xffb020 : 0xe5484d);
-const TRUCK_W = 150, CABIN_H = 56, PERSON_H = 36;
+const TRUCK_W = 200, CABIN_H = 56, PERSON_H = 36;
 
 /** soft contact shadow: stacked translucent ellipses, light from screen upper-left -> offset lower-right */
 function shadow(rx: number, ry: number): Graphics {
@@ -45,8 +45,6 @@ function drawCabinGauge(g: Graphics, ratio: number) {
 // ---- truck view: 4 diagonal sprites, one visible ----
 type Dir = 'dl' | 'dr' | 'ul' | 'ur';
 const ANCHOR: Record<Dir, [number, number]> = { dr: [0.45, 0.68], ul: [0.47, 0.66], dl: [0.55, 0.68], ur: [0.53, 0.66] };
-/** Tank centre per view, relative to the anchor (screen px at TRUCK_W). */
-const LOGO_AT: Record<Dir, [number, number]> = { dr: [-17, -40], dl: [17, -40], ul: [6, -29], ur: [-6, -29] };
 interface TruckView {
   c: Container; body: Container; views: Partial<Record<Dir, Container>>; gauge: Graphics; topY: number;
   x: number; y: number; a: number; px: number; py: number; dir: Dir; job: string; q: number; spd: number; dustT: number;
@@ -176,13 +174,12 @@ export function createRender(): RenderApi & RenderExtra {
       const s = realSprite(`truck-${d}`, ANCHOR[d][0], ANCHOR[d][1], { w: TRUCK_W });
       if (s) {
         const v = new Container(); v.visible = false; v.addChild(s);
-        const mark = logo(36); if (mark) { mark.position.set(...LOGO_AT[d]); v.addChild(mark); } // brand on the tank
         views[d] = v; body.addChild(v); topY = Math.min(topY, -s.height * ANCHOR[d][1]);
       }
     }
     if (!Object.keys(views).length) body.addChild(art('truck', 0.85)); // placeholder, no sprites
     const gauge = new Graphics(); gauge.position.set(0, topY - 18);
-    c.addChild(shadow(62, 28), body, gauge); actors.addChild(c);
+    c.addChild(shadow(83, 37), body, gauge); actors.addChild(c);
     const p = iso(t.x, t.y);
     return { c, body, views, gauge, topY, x: t.x, y: t.y, a: t.angle, px: p.x, py: p.y, dir: dirOf(t.angle), job: t.job, q: -1, spd: 0, dustT: 0 };
   }
