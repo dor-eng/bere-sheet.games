@@ -6,7 +6,7 @@ import { art, loadAssets, loadReal, logo, personArt, realSprite, INK } from './a
 import { Camera, bindGestures } from './camera.ts';
 import { FxLayer } from './fx.ts';
 import { iso, isoRect, unIso, ISO_W, ISO_H } from './iso.ts';
-import { buildGates, buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
+import { buildDumps, buildGates, buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
 import { gateCrowded } from '../sim/index.ts';
 
 const gaugeColor = (r: number) => (r < 0.6 ? 0x3dd68c : r < 0.85 ? 0xffb020 : 0xe5484d);
@@ -259,7 +259,7 @@ export function createRender(): RenderApi & RenderExtra {
       const st = buildStatic(map);
       for (const t of st.things) actors.addChild(t);
       gates = buildGates(map); gates.visible = false; // crowd-flow gate barriers: only while a gate window is open
-      world.addChild(st.ground, gates, padLayer, sel, actors, fx.layer);
+      world.addChild(st.ground, buildDumps(map), gates, padLayer, sel, actors, fx.layer); // dump stations: none on maps without map.dumps
       app.stage.addChild(world);
       cam = new Camera(world, ISO_W, ISO_H);
       cam.resize(el.clientWidth || app.screen.width, el.clientHeight || app.screen.height);

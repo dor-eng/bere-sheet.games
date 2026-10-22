@@ -11,6 +11,7 @@ export interface CityMap {
   id: string; name: string; width: number; height: number;
   depotNodeId: string; depot: { x: number; y: number }; bg?: string; // painted background key, default 'bg'
   nodes: MapNode[]; edges: MapEdge[]; spots: SiteSpot[]; decor: Decor[];
+  dumps?: { nodeId: string; x: number; y: number }[]; // satellite dump stations: a truck that finished pumping empties its tank at the fastest of depot + dumps (no stock/wash there); x/y = marker position
 }
 
 // ---------- level data (src/data/levels.json + economy.json, owner: sim lane) ----------
@@ -27,7 +28,7 @@ export interface SiteDef {
 export interface UnlockDef { kind: 'site' | 'equipment' | 'vehicle' | 'city' | 'mechanic'; name: string; desc: string; icon: AssetKey }
 export interface LevelDef {
   id: number; title: string; dayLength: number; // sim seconds
-  city?: string; // CityMap id ('city-beach' | 'city-capital' | 'city-shows'), default 'city-real'
+  city?: string; // CityMap id ('city-beach' | 'city-capital' | 'city-shows' | 'city-industry'), default 'city-real'
   gateWindows?: [number, number][]; // sim-second [from, to) windows when 'gate' edges crawl (ECON.gateSpeedMult); none = gates are plain roads
   sites: SiteDef[];
   coinTarget: number; // 3rd star

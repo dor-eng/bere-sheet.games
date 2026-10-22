@@ -5,6 +5,7 @@ import city1 from '../data/city1.json' with { type: 'json' };
 import cityBeach from '../data/city-beach.json' with { type: 'json' };
 import cityCapital from '../data/city-capital.json' with { type: 'json' };
 import cityShows from '../data/city-shows.json' with { type: 'json' };
+import cityIndustry from '../data/city-industry.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
 import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, gateCrowded, LEVELS, UPGRADES, ECON } from './index.ts';
 
@@ -221,7 +222,7 @@ test('economy: applyResult advances + keeps best stars, upgrades cost + cap', ()
   for (let i = 0; i < 3; i++) { const r = buyUpgrade(cur, 'pump'); assert.ok(r.ok); cur = r.save; }
   assert.equal(cur.upgrades.pump, 3); assert.equal(buyUpgrade(cur, 'pump').ok, false);
   for (const u of UPGRADES) { assert.equal(u.values.length, 4); assert.equal(u.costs.length, 3); }
-  assert.equal(LEVELS.length, 12);
+  assert.equal(LEVELS.length, 15);
   const s3 = createDay(LEVELS[0], map, cur);
   assert.equal(s3.trucks[0].pumpRate, 70);
 });
@@ -431,5 +432,103 @@ test('shows play: bot reaches day end with >=1 star on L10-L12', () => {
     const r = dayResult(s);
     console.log('L' + l.id, JSON.stringify(r));
     assert.ok(r.stars >= 1, 'L' + l.id);
+  }
+});
+
+// ---------- city 5 industry (step G4): long distances + satellite dump stations (map.dumps) ----------
+const industry = cityIndustry as unknown as CityMap;
+/** Tiny line map: depot D --(far, 1200px)-- S (site) --(200px)-- X (dump). Truck pumps at S, then dumps. */
+const lineMap = (dumps?: CityMap['dumps']): CityMap => ({
+  id: 'line', name: 'line', width: 1600, height: 200, depotNodeId: 'D', depot: { x: 0, y: 100 },
+  nodes: [{ id: 'D', x: 0, y: 100 }, { id: 'S', x: 1200, y: 100 }, { id: 'X', x: 1400, y: 100 }],
+  edges: [{ a: 'D', b: 'S', kind: 'main' }, { a: 'S', b: 'X', kind: 'main' }],
+  spots: [{ id: 'sp', nodeId: 'S', x: 1200, y: 60, slots: [{ x: 1180, y: 60 }, { x: 1220, y: 60 }] }], decor: [], dumps,
+});
+/** Deliver 2 cabins at S, let them fill, service; returns the state when the truck is idle again + sec from pump end to idle. */
+function dumpTrip(m: CityMap) {
+  const lv: LevelDef = { ...LEVELS[0], dayLength: 2000, sites: [{ id: 'x', type: 'construction', name: 'אתר', spotId: 'sp', openAt: 0, closeAt: 1900, usage: [[0, 2]], fee: 0, serviceTip: 0, overflowFinePerSec: 0 }] };
+  const s = createDay(lv, m, newSave());
+  const t = s.trucks[0];
+  assert.ok(command(s, { type: 'deliver', truckId: 't1', siteId: 'x', count: 2 }).ok);
+  runUntil(s, () => t.job === 'idle', 600);
+  run(s, 40);
+  assert.ok(command(s, { type: 'service', truckId: 't1', siteId: 'x' }).ok);
+  runUntil(s, () => t.job === 'toDepot', 600);
+  const tank = t.tank, start = s.time, path = [...t.path];
+  assert.ok(tank > 0);
+  runUntil(s, () => t.job === 'idle', 600);
+  return { s, t, sec: s.time - start, path, tank };
+}
+test('industry sim: a truck dumps at a satellite dump nearer than the depot, parks there; stock untouched', () => {
+  const m = lineMap([{ nodeId: 'X', x: 1400, y: 60 }]);
+  const r = dumpTrip(m);
+  assert.deepEqual(r.path, ['S', 'X']);
+  assert.equal(r.t.tank, 0);
+  assert.equal(r.t.job, 'idle');
+  assert.equal(r.t.path[r.t.path.length - 1], 'X');
+  assert.deepEqual([r.t.x, r.t.y], [1400, 100]);
+  const travel = pathTime(m, ['S', 'X'], ECON.truck.speed), expect = travel + r.tank / ECON.dumpRate;
+  assert.ok(Math.abs(r.sec - expect) <= DT * 3, `${r.sec} vs ${expect}`);
+  const base = dumpTrip(lineMap()); // negative control: no dumps -> depot, old timing
+  assert.ok(r.sec < base.sec - 5, `${r.sec} vs depot ${base.sec}`);
+  // the truck parked at the dump can still be sent out; deliver keeps its rule (cabins from depot stock)
+  assert.ok(command(r.s, { type: 'service', truckId: 't1', siteId: 'x' }).ok);
+});
+test('industry sim: no map.dumps (negative control) -> truck goes to the depot, old timing, cabins/tank as before', () => {
+  const m = lineMap();
+  const r = dumpTrip(m);
+  assert.deepEqual(r.path, ['S', 'D']);
+  assert.equal(r.t.tank, 0);
+  assert.equal(r.t.path[r.t.path.length - 1], 'D');
+  const expect = pathTime(m, ['S', 'D'], ECON.truck.speed) + r.tank / ECON.dumpRate;
+  assert.ok(Math.abs(r.sec - expect) <= DT * 3, `${r.sec} vs ${expect}`);
+  // a dump that is farther than the depot is ignored
+  const far = dumpTrip({ ...lineMap([{ nodeId: 'X', x: 1400, y: 60 }]), nodes: [{ id: 'D', x: 0, y: 100 }, { id: 'S', x: 300, y: 100 }, { id: 'X', x: 1400, y: 100 }] });
+  assert.deepEqual(far.path, ['S', 'D']);
+});
+test('industry: map has long distances, rail gate crossings with a way round, dump nodes on the graph', () => {
+  assert.equal(industry.id, 'city-industry');
+  assert.ok(industry.edges.filter((e) => e.kind === 'gate').length >= 1);
+  assert.ok((industry.dumps ?? []).length >= 1);
+  for (const d of industry.dumps!) assert.ok(industry.nodes.some((n) => n.id === d.nodeId), d.nodeId);
+  const q = industry.spots.find((p) => p.id === 'spot-quarry')!;
+  const far = (id: string) => pathTime(industry, route(industry, industry.depotNodeId, id), 110);
+  for (const p of industry.spots) assert.ok(far(q.nodeId) >= far(p.nodeId), p.id); // quarry = farthest
+  assert.ok(far(q.nodeId) > 15, String(far(q.nodeId)));
+  for (const p of industry.spots) assert.ok(route(industry, industry.depotNodeId, p.nodeId, true).length > 1, p.id);
+});
+test('industry: levels 13-15 use the industry map, every site spot reachable; rail windows on L14-15', () => {
+  const lv = LEVELS.filter((l) => l.city === 'city-industry');
+  assert.deepEqual(lv.map((l) => l.id), [13, 14, 15]);
+  for (const l of lv) for (const st of l.sites) {
+    const spot = industry.spots.find((p) => p.id === st.spotId)!;
+    assert.ok(spot, st.spotId);
+    assert.ok(route(industry, industry.depotNodeId, spot.nodeId).length > 1, st.spotId);
+  }
+  for (const l of lv.slice(1)) {
+    assert.ok(l.gateWindows && l.gateWindows.length >= 1, 'L' + l.id);
+    for (const [a, b] of l.gateWindows!) assert.ok(a < b && b <= l.dayLength, 'L' + l.id);
+    assert.ok(l.sites.some((x) => x.closeAt < l.dayLength - 60), 'L' + l.id + ' plant shutdown');
+  }
+  assert.equal(LEVELS.find((l) => l.id === 12)!.unlock.name, 'עיר התעשייה');
+  assert.equal(LEVELS.find((l) => l.id === 15)!.unlock.name, 'בקרוב');
+});
+test('industry play: bot reaches day end with >=1 star on L13-L15 and uses the dump stations', () => {
+  const save: Save = { coins: 0, level: 13, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
+  for (const l of LEVELS.filter((x) => x.city === 'city-industry')) {
+    const s = createDay(l, industry, { ...save, level: l.id });
+    let n = 0, dumped = 0;
+    const dumpNodes = new Set(industry.dumps!.map((d) => d.nodeId));
+    while (!s.over) {
+      if (n++ % 15 === 0) botAct(s);
+      const before = s.trucks[0].job;
+      step(s, DT);
+      const t = s.trucks[0];
+      if (before === 'toDepot' && t.job !== 'toDepot' && dumpNodes.has(t.path[t.path.length - 1])) dumped++;
+    }
+    const r = dayResult(s);
+    console.log('L' + l.id, JSON.stringify(r), 'dumps', dumped);
+    assert.ok(r.stars >= 1, 'L' + l.id);
+    assert.ok(dumped >= 1, 'L' + l.id + ' dumps');
   }
 });

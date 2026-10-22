@@ -1,5 +1,5 @@
 // Static scene (iso): painted background sprite + optional procedural roads; depot/decor returned as y-sortable things; site pads.
-import { Container, Graphics, Sprite } from 'pixi.js';
+import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import type { CityMap, SiteSpot, SiteType } from '../sim/types.ts';
 import { art, INK, realSprite, realTex, type RealKey } from './assets.ts';
 import { iso, isoRect, ISO_W, ISO_H } from './iso.ts';
@@ -61,6 +61,25 @@ export function buildGates(map: CityMap): Graphics {
     }
   }
   return g;
+}
+
+/** Satellite dump stations (map.dumps): placeholder pad (asphalt + yellow hazard rim + drain) linked to its road node, Hebrew label. Art later. */
+export function buildDumps(map: CityMap): Container {
+  const c = new Container();
+  const g = new Graphics(); c.addChild(g);
+  const node = new Map(map.nodes.map((n) => [n.id, n]));
+  for (const d of map.dumps ?? []) {
+    const n = node.get(d.nodeId); if (!n) continue;
+    const hw = 13;
+    g.poly(isoRect(Math.min(d.x, n.x) - hw, n.y - hw, Math.max(d.x, n.x) + hw, n.y + hw)).fill({ color: 0x55606c });
+    g.poly(isoRect(d.x - hw, Math.min(d.y, n.y) - hw, d.x + hw, Math.max(d.y, n.y) + hw)).fill({ color: 0x55606c });
+    g.poly(isoRect(d.x - 46, d.y - 46, d.x + 46, d.y + 46)).fill({ color: 0x4a5059 }).stroke({ width: 8, color: 0xffc83d });
+    const p = iso(d.x, d.y);
+    g.ellipse(p.x, p.y, 30, 15).fill({ color: 0x2b2f35 }).stroke({ width: 4, color: 0x8a939e });
+    const t = new Text({ text: 'תחנת ריקון', style: { fontFamily: 'Rubik, system-ui, sans-serif', fontWeight: '800', fontSize: 26, fill: 0xffffff, stroke: { color: INK, width: 6, join: 'round' } } });
+    t.anchor.set(0.5, 1); t.position.set(p.x, p.y - 34); c.addChild(t);
+  }
+  return c;
 }
 
 /** Ground layer (under everything) + depot/decor as separate containers for the y-sorted dynamic layer. */

@@ -963,8 +963,8 @@
   "city": "city-shows",
   "unlock": {
    "kind": "city",
-   "name": "בקרוב",
-   "desc": "בקרוב: עוד עיר ועוד אירועים",
+   "name": "עיר התעשייה",
+   "desc": "הבא: עיר התעשייה. מרחקים ארוכים, תחנות ריקון ליד המפעלים ומחסומי רכבת",
    "icon": "icon-star"
   },
   "gateWindows": [
@@ -1111,6 +1111,364 @@
     "fee": 280,
     "serviceTip": 14,
     "overflowFinePerSec": 3.5
+   }
+  ]
+ },
+ {
+  "id": 13,
+  "title": "יום עבודה במפעלים",
+  "dayLength": 270,
+  "coinTarget": 820,
+  "city": "city-industry",
+  "unlock": {
+   "kind": "mechanic",
+   "name": "עבודות ברכבת",
+   "desc": "הבא: רכבות ועבודות במסילה סוגרות את המעברים, מפעל נסגר באמצע היום",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s1",
+    "type": "construction",
+    "name": "מפעל המתכת - קו ייצור",
+    "spotId": "spot-factory-a",
+    "openAt": 20,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      0.8
+     ],
+     [
+      65,
+      3.2
+     ],
+     [
+      85,
+      3.2
+     ],
+     [
+      90,
+      0.8
+     ],
+     [
+      150,
+      0.8
+     ],
+     [
+      155,
+      3.4
+     ],
+     [
+      175,
+      3.4
+     ],
+     [
+      180,
+      0.8
+     ]
+    ],
+    "fee": 260,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3.5
+   },
+   {
+    "id": "s2",
+    "type": "construction",
+    "name": "מפעל הפלסטיק - משמרות",
+    "spotId": "spot-factory-b",
+    "openAt": 95,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.7
+     ],
+     [
+      55,
+      0.7
+     ],
+     [
+      60,
+      3.0
+     ],
+     [
+      80,
+      3.0
+     ],
+     [
+      85,
+      0.7
+     ],
+     [
+      150,
+      0.7
+     ],
+     [
+      155,
+      3.0
+     ],
+     [
+      170,
+      3.0
+     ],
+     [
+      175,
+      0.7
+     ]
+    ],
+    "fee": 280,
+    "serviceTip": 15,
+    "overflowFinePerSec": 3.5
+   },
+   {
+    "id": "s3",
+    "type": "construction",
+    "name": "הפארק הלוגיסטי",
+    "spotId": "spot-logistics",
+    "openAt": 60,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      100,
+      0.9
+     ],
+     [
+      200,
+      0.7
+     ]
+    ],
+    "fee": 150,
+    "serviceTip": 10,
+    "overflowFinePerSec": 1.5
+   }
+  ]
+ },
+ {
+  "id": 14,
+  "title": "עבודות ברכבת",
+  "dayLength": 270,
+  "coinTarget": 860,
+  "city": "city-industry",
+  "gateWindows": [
+   [
+    70,
+    110
+   ],
+   [
+    170,
+    210
+   ]
+  ],
+  "unlock": {
+   "kind": "site",
+   "name": "המחצבה",
+   "desc": "הבא: המחצבה הרחוקה, הכי רחוק מהמחסן, תחנת ריקון בדרך",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s4",
+    "type": "construction",
+    "name": "מסוף הרכבת - עבודות במסילה",
+    "spotId": "spot-rail-yard",
+    "openAt": 60,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      1.0
+     ],
+     [
+      60,
+      1.6
+     ],
+     [
+      150,
+      1.8
+     ],
+     [
+      220,
+      1.2
+     ]
+    ],
+    "fee": 230,
+    "serviceTip": 13,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s5",
+    "type": "construction",
+    "name": "מפעל הפלסטיק - נסגר בצהריים",
+    "spotId": "spot-factory-b",
+    "openAt": 20,
+    "closeAt": 160,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      40,
+      1.6
+     ],
+     [
+      90,
+      2.0
+     ],
+     [
+      120,
+      1.4
+     ]
+    ],
+    "fee": 260,
+    "serviceTip": 15,
+    "overflowFinePerSec": 3.5
+   },
+   {
+    "id": "s6",
+    "type": "construction",
+    "name": "מפעל המתכת - קו ייצור",
+    "spotId": "spot-factory-a",
+    "openAt": 100,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      0.8
+     ],
+     [
+      65,
+      3.0
+     ],
+     [
+      85,
+      3.0
+     ],
+     [
+      90,
+      1.0
+     ]
+    ],
+    "fee": 250,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3.5
+   }
+  ]
+ },
+ {
+  "id": 15,
+  "title": "המחצבה",
+  "dayLength": 280,
+  "coinTarget": 840,
+  "city": "city-industry",
+  "gateWindows": [
+   [
+    90,
+    130
+   ],
+   [
+    200,
+    240
+   ]
+  ],
+  "unlock": {
+   "kind": "city",
+   "name": "בקרוב",
+   "desc": "בקרוב: עוד עיר ועוד אירועים",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s7",
+    "type": "construction",
+    "name": "המחצבה - פיצוצים וחציבה",
+    "spotId": "spot-quarry",
+    "openAt": 25,
+    "closeAt": 275,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      1.4
+     ],
+     [
+      150,
+      1.8
+     ],
+     [
+      220,
+      1.2
+     ]
+    ],
+    "fee": 340,
+    "serviceTip": 18,
+    "overflowFinePerSec": 4
+   },
+   {
+    "id": "s8",
+    "type": "construction",
+    "name": "מפעל המתכת - השבתה",
+    "spotId": "spot-factory-a",
+    "openAt": 75,
+    "closeAt": 170,
+    "usage": [
+     [
+      0,
+      0.9
+     ],
+     [
+      40,
+      1.7
+     ],
+     [
+      80,
+      1.3
+     ]
+    ],
+    "fee": 220,
+    "serviceTip": 13,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s9",
+    "type": "construction",
+    "name": "הפארק הלוגיסטי",
+    "spotId": "spot-logistics",
+    "openAt": 120,
+    "closeAt": 275,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      80,
+      1.2
+     ],
+     [
+      180,
+      0.9
+     ]
+    ],
+    "fee": 170,
+    "serviceTip": 11,
+    "overflowFinePerSec": 2
    }
   ]
  }

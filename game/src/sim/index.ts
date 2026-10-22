@@ -265,7 +265,8 @@ function move(s: GameState, t: Truck, dt: number): boolean {
 function arrive(s: GameState, t: Truck) {
   const atDepot = t.path[t.path.length - 1] === s.map.depotNodeId;
   if (t.job === 'toSite') { t.job = 'pumping'; return; }
-  if (t.job === 'toDepot') { unloadToStock(s, t); t.job = 'dumping'; if (t.tank <= EPS) { t.tank = 0; t.job = 'idle'; t.targetSiteId = null; } return; }
+  // toDepot ends at the depot or at a satellite dump (map.dumps): a dump empties the tank only, no stock/wash there
+  if (t.job === 'toDepot') { if (atDepot) unloadToStock(s, t); t.job = 'dumping'; if (t.tank <= EPS) { t.tank = 0; t.job = 'idle'; t.targetSiteId = null; } return; }
   if (t.job === 'delivering') {
     if (atDepot) { unloadToStock(s, t); t.job = 'idle'; t.targetSiteId = null; return; }
     const site = t.targetSiteId ? siteOf(s, t.targetSiteId) : undefined;
@@ -321,8 +322,20 @@ function pump(s: GameState, t: Truck, dt: number) {
     if (more && t.tankCap - t.tank > EPS) return; // keep pumping
   }
   t.job = 'toDepot';
-  startRoute(s, t, s.map.depotNodeId);
+  startRoute(s, t, dumpTarget(s, t));
   if (t.path.length === 1) arrive(s, t);
+}
+/** Where a full truck goes to empty: the depot, or a satellite dump (map.dumps) that is faster from here right now. No dumps -> depot. */
+function dumpTarget(s: GameState, t: Truck): string {
+  const from = t.path[t.path.length - 1], cr = crowdedNow(s);
+  let best = s.map.depotNodeId, bestT = pathTime(s.map, route(s.map, from, best, cr), t.speed, cr);
+  for (const d of s.map.dumps ?? []) {
+    const p = route(s.map, from, d.nodeId, cr);
+    if (p.length === 0) continue;
+    const tt = pathTime(s.map, p, t.speed, cr);
+    if (tt < bestT) { best = d.nodeId; bestT = tt; }
+  }
+  return best;
 }
 const partial = new WeakSet<Cabin>(); // cabins already being drained (finish them even below pumpMinFill)
 const pumpable = (c: Cabin) => c.fill > EPS && (c.fill >= ECON.pumpMinFill || partial.has(c));
