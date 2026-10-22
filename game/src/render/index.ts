@@ -9,7 +9,7 @@ import { iso, isoRect, unIso, ISO_W, ISO_H } from './iso.ts';
 import { buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
 
 const gaugeColor = (r: number) => (r < 0.6 ? 0x3dd68c : r < 0.85 ? 0xffb020 : 0xe5484d);
-const TRUCK_W = 200, CABIN_H = 56, PERSON_H = 36;
+const TRUCK_W = 280, CABIN_H = 56, PERSON_H = 36;
 
 /** soft contact shadow: stacked translucent ellipses, light from screen upper-left -> offset lower-right */
 function shadow(rx: number, ry: number): Graphics {
@@ -179,7 +179,7 @@ export function createRender(): RenderApi & RenderExtra {
     }
     if (!Object.keys(views).length) body.addChild(art('truck', 0.85)); // placeholder, no sprites
     const gauge = new Graphics(); gauge.position.set(0, topY - 18);
-    c.addChild(shadow(83, 37), body, gauge); actors.addChild(c);
+    c.addChild(shadow(116, 52), body, gauge); actors.addChild(c);
     const p = iso(t.x, t.y);
     return { c, body, views, gauge, topY, x: t.x, y: t.y, a: t.angle, px: p.x, py: p.y, dir: dirOf(t.angle), job: t.job, q: -1, spd: 0, dustT: 0 };
   }
