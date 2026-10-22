@@ -1,13 +1,14 @@
 // Static scene (iso): painted background sprite + optional procedural roads; depot/decor returned as y-sortable things; site pads.
 import { Container, Graphics, Sprite } from 'pixi.js';
 import type { CityMap, SiteSpot, SiteType } from '../sim/types.ts';
-import { art, INK, realSprite, realTex } from './assets.ts';
+import { art, INK, realSprite, realTex, type RealKey } from './assets.ts';
 import { iso, isoRect, ISO_W, ISO_H } from './iso.ts';
 
 export const GROUND = 0xc4b89c;
 /** Fallback: draw the procedural ground/roads over the painted background (if its painted roads drift from the graph). */
 export const DRAW_ROADS = false;
-const ROAD_W = { main: 64, street: 42 } as const;
+let bgKey: RealKey = 'bg'; // painted background of the mounted city (set by buildStatic)
+const ROAD_W = { main: 64, street: 42, sand: 36 } as const;
 
 function drawRoads(g: Graphics, map: CityMap) {
   g.poly(isoRect(0, 0, map.width, map.height)).fill({ color: 0x9fb98a });
@@ -24,7 +25,7 @@ function drawRoads(g: Graphics, map: CityMap) {
   };
   const dn = node.get(map.depotNodeId)!;
   g.poly(seg(map.depot.x, map.depot.y, dn.x, dn.y, 26)).fill({ color: 0x55606c });
-  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.poly(seg(a.x, a.y, b.x, b.y, ROAD_W[e.kind])).fill({ color: e.kind === 'main' ? 0x3e434a : 0x4d535b }); }
+  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.poly(seg(a.x, a.y, b.x, b.y, ROAD_W[e.kind])).fill({ color: e.kind === 'main' ? 0x3e434a : e.kind === 'sand' ? 0xd8bf8a : 0x4d535b }); }
   for (const e of map.edges) {
     if (e.kind !== 'main') continue;
     const a = node.get(e.a)!, b = node.get(e.b)!;
@@ -39,7 +40,8 @@ function drawRoads(g: Graphics, map: CityMap) {
 /** Ground layer (under everything) + depot/decor as separate containers for the y-sorted dynamic layer. */
 export function buildStatic(map: CityMap): { ground: Container; things: Container[] } {
   const ground = new Container();
-  const t = realTex('bg');
+  bgKey = (map.bg ?? 'bg') as RealKey;
+  const t = realTex(bgKey);
   if (t) { const bg = new Sprite(t); bg.width = ISO_W; bg.height = ISO_H; bg.tint = 0xd9d9d9; ground.addChild(bg); } // any pixel size, stretched; dimmed ~15% so actors pop
   else { const g = new Graphics(); g.rect(0, 0, ISO_W, ISO_H).fill({ color: GROUND }); ground.addChild(g); }
   if (DRAW_ROADS || !t) { const g = new Graphics(); drawRoads(g, map); ground.addChild(g); }
@@ -81,8 +83,8 @@ export function buildPad(spot: SiteSpot, type: SiteType, node?: { x: number; y: 
     else g.ellipse(p.x, p.y, 5, 3).fill({ color: [0xf48fb1, 0xffffff, 0x7fd0ff][(d / step) % 3 | 0] });
   }
   const back = iso(cx, y0 + 50);
-  const painted = !!realTex('bg'); // construction lots are painted into the background
-  const prop = con ? null : realSprite('prop-wedding', 0.5, 0.85, { w: 200 });
+  const painted = !!realTex(bgKey); // construction lots are painted into the background
+  const prop = con ? null : (type === 'beach' && realSprite('prop-beach', 0.5, 0.85, { w: 220 })) || realSprite('prop-wedding', 0.5, 0.85, { w: 200 });
   if (prop) { prop.position.set(back.x, back.y); c.addChild(prop); }
   else if (con) {
     if (painted) return { c, w, h, cx, cy, x0, y0, x1, y1 };

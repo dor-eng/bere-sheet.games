@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import city1 from '../data/city1.json' with { type: 'json' };
+import cityBeach from '../data/city-beach.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
 import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, LEVELS, UPGRADES } from './index.ts';
 
@@ -41,8 +42,8 @@ function botAct(s: GameState) {
   }
   serve(fullest(0.6));
 }
-function playBot(level: LevelDef, save: Save) {
-  const s = createDay(level, map, save);
+function playBot(level: LevelDef, save: Save, m: CityMap = map) {
+  const s = createDay(level, m, save);
   let n = 0;
   while (!s.over) { if (n++ % 15 === 0) botAct(s); step(s, DT); }
   return s;
@@ -218,7 +219,7 @@ test('economy: applyResult advances + keeps best stars, upgrades cost + cap', ()
   for (let i = 0; i < 3; i++) { const r = buyUpgrade(cur, 'pump'); assert.ok(r.ok); cur = r.save; }
   assert.equal(cur.upgrades.pump, 3); assert.equal(buyUpgrade(cur, 'pump').ok, false);
   for (const u of UPGRADES) { assert.equal(u.values.length, 4); assert.equal(u.costs.length, 3); }
-  assert.equal(LEVELS.length, 3);
+  assert.equal(LEVELS.length, 6);
   const s3 = createDay(LEVELS[0], map, cur);
   assert.equal(s3.trucks[0].pumpRate, 70);
 });
@@ -265,4 +266,28 @@ test('wash: washed event fires per cabin; both clean after two cycles', () => {
   for (let i = 0; i < Math.round((110 + 2 * ECONW.sec + 1) / DT) && !s.over; i++) { step(s, DT); washed += s.events.filter((e) => e.kind === 'washed').length; }
   assert.equal(washed, 2);
   assert.ok(s.cabins.filter((c) => c.siteId === null).every((c) => c.washT === 0));
+});
+
+// ---------- city 2 beach (step G1) ----------
+const beach = cityBeach as unknown as CityMap;
+test('beach: sand tracks are slower than asphalt of the same length', () => {
+  const sand = pathTime(beach, ['B1', 'B2'], 100), asphalt = pathTime(beach, ['A1', 'A2', 'A3'], 100); // both 480 long
+  assert.ok(sand > asphalt * 2, `sand ${sand} vs asphalt ${asphalt}`);
+});
+test('beach: levels 4-6 use the beach map, every site spot reachable from the depot', () => {
+  const lv = LEVELS.filter((l) => l.city === 'city-beach');
+  assert.deepEqual(lv.map((l) => l.id), [4, 5, 6]);
+  for (const l of lv) for (const st of l.sites) {
+    const spot = beach.spots.find((p) => p.id === st.spotId)!;
+    assert.ok(spot, st.spotId);
+    assert.ok(route(beach, beach.depotNodeId, spot.nodeId).length > 1, st.spotId);
+  }
+});
+test('beach play: bot gets >=1 star on L4-L6', () => {
+  const save: Save = { coins: 0, level: 4, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
+  for (const l of LEVELS.slice(3)) {
+    const r = dayResult(playBot(l, { ...save, level: l.id }, beach));
+    console.log('L' + l.id, JSON.stringify(r));
+    assert.ok(r.stars >= 1, 'L' + l.id);
+  }
 });

@@ -11,7 +11,7 @@ import economyJson from '../data/economy.json' with { type: 'json' };
 export const LEVELS = levelsJson as unknown as LevelDef[];
 export const ECON = economyJson as unknown as {
   cabinCapacity: number; cabinCarry: number; truck: { name: string; speed: number };
-  streetSpeedMult: number; dumpRate: number; pumpMinFill: number; feeOverflowTolerance: number;
+  streetSpeedMult: number; sandSpeedMult: number; dumpRate: number; pumpMinFill: number; feeOverflowTolerance: number;
   starFractions: number[]; upgrades: UpgradeDef[]; wash: { sec: number; bays: number };
 };
 export const UPGRADES: UpgradeDef[] = ECON.upgrades;
@@ -24,7 +24,7 @@ export function newSave(): Save {
 }
 
 // ---------- routing ----------
-const edgeMult = (kind: string) => (kind === 'street' ? ECON.streetSpeedMult : 1);
+const edgeMult = (kind: string) => (kind === 'street' ? ECON.streetSpeedMult : kind === 'sand' ? ECON.sandSpeedMult : 1);
 const nodeOf = (map: CityMap, id: string) => map.nodes.find((n) => n.id === id)!;
 function edgeBetween(map: CityMap, a: string, b: string) {
   return map.edges.find((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));

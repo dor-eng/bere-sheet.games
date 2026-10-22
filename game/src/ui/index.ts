@@ -17,6 +17,7 @@ const JOB: Record<TruckJob, [string, string]> = {
   idle: ['חונה', 's-idle'], toSite: ['בדרך', 's-go'], delivering: ['בדרך', 's-go'], toDepot: ['בדרך', 's-go'],
   pumping: ['שואב', 's-pump'], dumping: ['מרוקן', 's-dump'],
 };
+const SITE_ICON: Record<string, string> = { construction: '🏗️', wedding: '💒', beach: '🏖️' };
 const ICON: Record<string, string> = { site: '🏗️', equipment: '🧰', vehicle: '🚚', city: '🏙️', mechanic: '⚙️' };
 const el = (cls: string, tag = 'div') => { const e = document.createElement(tag); e.className = cls; return e; };
 const pct = (a: number, b: number) => Math.max(0, Math.min(100, Math.round((a / (b || 1)) * 100)));
@@ -118,7 +119,7 @@ export function createUi(): UiApi & UiExtra {
       const total = cabs.reduce((n, c) => n + c.fill / (c.capacity || 1), 0) / (cabs.length || 1);
       const free = s.cabins.filter(clean).length, wash = s.cabins.filter(dirty).length;
       const status = st.closed ? 'האתר סגור' : st.open ? 'האתר פתוח' : 'עוד לא נפתח';
-      html = `<h3><span>${st.def.type === 'wedding' ? '💒' : '🏗️'} ${esc(st.def.name)}</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
+      html = `<h3><span>${SITE_ICON[st.def.type]} ${esc(st.def.name)}</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
         `<div class="ui-sub">${status} · <span class="trend">${trendOf(st.def.id)}</span> · ${DROP}</div>` +
         `<div class="ui-cabins">${cabs.map((c) => { const p = pct(c.fill, c.capacity); return `<div class="cab"><div class="gauge ${heat(p)}"><i style="height:${p}%"></i></div>${p}%</div>`; }).join('') || '<div class="ui-sub">אין תאים באתר</div>'}</div>` +
         `<div class="ui-sub">${cabs.length ? `ממוצע ${pct(total, 1)}%` : ''} · במחסן: ${free} תאים${wash ? ` (${wash} בשטיפה)` : ''}</div>` +
@@ -206,7 +207,7 @@ export function createUi(): UiApi & UiExtra {
 
   function showDayStart(level: LevelDef, save: Save) {
     const len = level.dayLength;
-    const sites = level.sites.map((s) => `<div class="site-row"><span>${s.type === 'wedding' ? '💒' : '🏗️'}</span><span>${esc(s.name)}</span><span class="t">${clock(s.openAt, len)}–${clock(s.closeAt, len)}</span></div>`).join('');
+    const sites = level.sites.map((s) => `<div class="site-row"><span>${SITE_ICON[s.type]}</span><span>${esc(s.name)}</span><span class="t">${clock(s.openAt, len)}–${clock(s.closeAt, len)}</span></div>`).join('');
     showCard(`<div class="logo"><img src="/play/assets/logo-white.svg" alt="בראשית"></div>` +
       `<h2>יום ${level.id}: ${esc(level.title)}</h2>` +
       `<div class="ui-sub" style="color:#4a5a6a;display:flex;justify-content:center;gap:6px;align-items:center">בקופה: <b>${fmt(save.coins)}</b>${COIN}</div>` +

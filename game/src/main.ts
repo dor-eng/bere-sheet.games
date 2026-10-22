@@ -4,12 +4,14 @@ import { createDay, step, command, dayResult, applyResult, buyUpgrade, LEVELS, n
 import { createRender } from './render/index.ts';
 import { createUi } from './ui/index.ts';
 import cityReal from './data/city-real.json';
+import cityBeach from './data/city-beach.json';
 
 const KEY = 'bereshit.save.v1';
-const map = cityReal as CityMap;
 let save: Save = JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? newSave();
 const persist = () => localStorage.setItem(KEY, JSON.stringify(save));
 const level = () => LEVELS[Math.min(save.level, LEVELS.length) - 1];
+const mapOf = (id?: string) => ((id === 'city-beach' ? cityBeach : cityReal) as CityMap);
+const map = mapOf(level().city); // ponytail: a new city reloads the page (render mounts once); live swap when cities need it
 
 let state: GameState = createDay(level(), map, save);
 let running = false, speed: 1 | 2 | 3 = 1;
@@ -20,7 +22,7 @@ await render.mount(document.getElementById('stage')!, map);
 render.onSelect((sel) => ui.select(sel, state));
 ui.mount(document.getElementById('ui')!, {
   command: (c) => command(state, c),
-  startDay: () => { state = createDay(level(), map, save); running = true; },
+  startDay: () => { if (mapOf(level().city) !== map) { location.reload(); return; } state = createDay(level(), map, save); running = true; },
   buyUpgrade: (id) => { const r = buyUpgrade(save, id); if (r.ok) { save = r.save; persist(); } return r; },
   setSpeed: (x) => { speed = x; },
   focus: (x, y) => render.focus(x, y),

@@ -150,14 +150,14 @@ export function personArt(kind: 'worker' | 'guest', i: number): Container {
 
 // ---- photoreal iso sprites (assets/real/*.png). Missing file -> null, caller falls back. ----
 export type RealKey = 'bg' | 'truck-dl' | 'truck-dr' | 'truck-ul' | 'truck-ur' | 'cabin' | 'worker' | 'guest'
-  | 'prop-wedding' | 'prop-depot';
-const REAL: RealKey[] = ['bg', 'truck-dl', 'truck-dr', 'truck-ul', 'truck-ur', 'cabin', 'worker', 'guest', 'prop-wedding', 'prop-depot'];
+  | 'prop-wedding' | 'prop-depot' | 'bg-beach' | 'prop-beach';
+const REAL: RealKey[] = ['bg', 'truck-dl', 'truck-dr', 'truck-ul', 'truck-ur', 'cabin', 'worker', 'guest', 'prop-wedding', 'prop-depot', 'bg-beach', 'prop-beach'];
 const real = new Map<RealKey, Texture>();
 
 export async function loadReal(): Promise<void> {
   const base = import.meta.env.BASE_URL + 'assets/real/';
   await Promise.all(REAL.map(async (k) => {
-    const url = base + k + (k === 'bg' ? '.jpg' : '.png');
+    const url = base + k + (k.startsWith('bg') ? '.jpg' : '.png');
     try {
       real.set(k, await Assets.load<Texture>(url));
     } catch { /* missing: fallback art */ }

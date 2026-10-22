@@ -3,6 +3,7 @@
   "cabinCarry": 2,
   "truck": { "name": "המשאית הישנה", "speed": 110 },
   "streetSpeedMult": 0.7,
+  "sandSpeedMult": 0.45,
   "dumpRate": 80,
   "pumpMinFill": 25,
   "feeOverflowTolerance": 12,

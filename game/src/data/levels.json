@@ -272,5 +272,253 @@
     "overflowFinePerSec": 4
    }
   ]
+ },
+ {
+  "id": 4,
+  "title": "עיר החוף: יום חוף ראשון",
+  "dayLength": 240,
+  "coinTarget": 460,
+  "city": "city-beach",
+  "unlock": {
+   "kind": "equipment",
+   "name": "פסטיבל קיץ",
+   "desc": "הבא: פסטיבל ענק על החוף השני",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s1",
+    "type": "construction",
+    "name": "אתר בנייה - מגדל מול הים",
+    "spotId": "spot-build-a",
+    "openAt": 30,
+    "closeAt": 235,
+    "usage": [
+     [
+      0,
+      0.9
+     ],
+     [
+      80,
+      1.3
+     ],
+     [
+      160,
+      1.5
+     ],
+     [
+      200,
+      1.2
+     ]
+    ],
+    "fee": 160,
+    "serviceTip": 10,
+    "overflowFinePerSec": 1.5
+   },
+   {
+    "id": "s2",
+    "type": "beach",
+    "name": "חוף הדולפינים - יום חוף",
+    "spotId": "spot-beach-a",
+    "openAt": 60,
+    "closeAt": 235,
+    "usage": [
+     [
+      0,
+      0.4
+     ],
+     [
+      40,
+      1.6
+     ],
+     [
+      120,
+      2.2
+     ],
+     [
+      190,
+      1.0
+     ]
+    ],
+    "fee": 220,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3
+   }
+  ]
+ },
+ {
+  "id": 5,
+  "title": "פסטיבל קיץ על החוף",
+  "dayLength": 240,
+  "coinTarget": 560,
+  "city": "city-beach",
+  "unlock": {
+   "kind": "equipment",
+   "name": "תחרות גלישה",
+   "desc": "הבא: חוף, פסטיבל ובנייה ביחד",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s2",
+    "type": "beach",
+    "name": "חוף הדולפינים - יום חוף",
+    "spotId": "spot-beach-a",
+    "openAt": 40,
+    "closeAt": 235,
+    "usage": [
+     [
+      0,
+      0.5
+     ],
+     [
+      50,
+      1.8
+     ],
+     [
+      140,
+      2.0
+     ],
+     [
+      200,
+      1.0
+     ]
+    ],
+    "fee": 220,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s3",
+    "type": "beach",
+    "name": "חוף הצוק - פסטיבל קיץ",
+    "spotId": "spot-beach-b",
+    "openAt": 100,
+    "closeAt": 235,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      20,
+      2.4
+     ],
+     [
+      70,
+      3.0
+     ],
+     [
+      110,
+      1.8
+     ]
+    ],
+    "fee": 320,
+    "serviceTip": 16,
+    "overflowFinePerSec": 3.5
+   }
+  ]
+ },
+ {
+  "id": 6,
+  "title": "תחרות גלישה וגם בנייה",
+  "dayLength": 250,
+  "coinTarget": 700,
+  "city": "city-beach",
+  "unlock": {
+   "kind": "equipment",
+   "name": "עיר הבירה",
+   "desc": "בקרוב: העיר הבאה",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s1",
+    "type": "construction",
+    "name": "אתר בנייה - מגדל מול הים",
+    "spotId": "spot-build-a",
+    "openAt": 30,
+    "closeAt": 235,
+    "usage": [
+     [
+      0,
+      0.9
+     ],
+     [
+      80,
+      1.3
+     ],
+     [
+      160,
+      1.5
+     ],
+     [
+      200,
+      1.2
+     ]
+    ],
+    "fee": 160,
+    "serviceTip": 10,
+    "overflowFinePerSec": 1.5
+   },
+   {
+    "id": "s2",
+    "type": "beach",
+    "name": "חוף הדולפינים - יום חוף",
+    "spotId": "spot-beach-a",
+    "openAt": 50,
+    "closeAt": 235,
+    "usage": [
+     [
+      0,
+      0.5
+     ],
+     [
+      50,
+      1.8
+     ],
+     [
+      140,
+      2.0
+     ],
+     [
+      200,
+      1.0
+     ]
+    ],
+    "fee": 220,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s3",
+    "type": "beach",
+    "name": "חוף הצוק - פסטיבל קיץ",
+    "spotId": "spot-beach-b",
+    "openAt": 120,
+    "closeAt": 235,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      20,
+      2.4
+     ],
+     [
+      70,
+      3.0
+     ],
+     [
+      110,
+      1.8
+     ]
+    ],
+    "fee": 320,
+    "serviceTip": 16,
+    "overflowFinePerSec": 3.5
+   }
+  ]
  }
 ]
