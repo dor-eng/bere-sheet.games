@@ -129,11 +129,11 @@ function retarget(s: GameState, t: Truck, to: string) {
 // ---------- day creation ----------
 export function createDay(level: LevelDef, map: CityMap, save: Save): GameState {
   const pump = UPGRADES.find((u) => u.id === 'pump')!.values[save.upgrades.pump];
-  const tank = UPGRADES.find((u) => u.id === 'tank')!.values[save.upgrades.tank];
+  const tank = Math.min(UPGRADES.find((u) => u.id === 'tank')!.values[save.upgrades.tank], level.maxTank ?? Infinity);
   const cabinCount = UPGRADES.find((u) => u.id === 'cabin')!.values[save.upgrades.cabin];
   const dn = nodeOf(map, map.depotNodeId);
   const truck: Truck = {
-    id: 't1', name: ECON.truck.name, job: 'idle', path: [map.depotNodeId], seg: 0, segT: 0,
+    id: 't1', name: level.maxTank ? 'המשאית הקטנה' : ECON.truck.name, job: 'idle', path: [map.depotNodeId], seg: 0, segT: 0,
     x: dn.x, y: dn.y, angle: 0, tank: 0, tankCap: tank, pumpRate: pump, speed: ECON.truck.speed,
     targetSiteId: null, carrying: 0,
   };

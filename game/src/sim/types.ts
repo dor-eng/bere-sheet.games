@@ -28,7 +28,8 @@ export interface SiteDef {
 export interface UnlockDef { kind: 'site' | 'equipment' | 'vehicle' | 'city' | 'mechanic'; name: string; desc: string; icon: AssetKey }
 export interface LevelDef {
   id: number; title: string; dayLength: number; // sim seconds
-  city?: string; // CityMap id ('city-beach' | 'city-capital' | 'city-shows' | 'city-industry'), default 'city-real'
+  city?: string; // CityMap id ('city-beach' | 'city-capital' | 'city-shows' | 'city-industry' | 'city-valley'), default 'city-real'
+  maxTank?: number; // small trucks only (rough roads): tank capped at this many liters whatever tank upgrade was bought
   gateWindows?: [number, number][]; // sim-second [from, to) windows when 'gate' edges crawl (ECON.gateSpeedMult); none = gates are plain roads
   sites: SiteDef[];
   coinTarget: number; // 3rd star

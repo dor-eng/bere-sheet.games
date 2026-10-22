@@ -6,6 +6,7 @@ import cityBeach from '../data/city-beach.json' with { type: 'json' };
 import cityCapital from '../data/city-capital.json' with { type: 'json' };
 import cityShows from '../data/city-shows.json' with { type: 'json' };
 import cityIndustry from '../data/city-industry.json' with { type: 'json' };
+import cityValley from '../data/city-valley.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
 import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, gateCrowded, LEVELS, UPGRADES, ECON } from './index.ts';
 
@@ -222,7 +223,7 @@ test('economy: applyResult advances + keeps best stars, upgrades cost + cap', ()
   for (let i = 0; i < 3; i++) { const r = buyUpgrade(cur, 'pump'); assert.ok(r.ok); cur = r.save; }
   assert.equal(cur.upgrades.pump, 3); assert.equal(buyUpgrade(cur, 'pump').ok, false);
   for (const u of UPGRADES) { assert.equal(u.values.length, 4); assert.equal(u.costs.length, 3); }
-  assert.equal(LEVELS.length, 15);
+  assert.equal(LEVELS.length, 18);
   const s3 = createDay(LEVELS[0], map, cur);
   assert.equal(s3.trucks[0].pumpRate, 70);
 });
@@ -518,7 +519,7 @@ test('industry: levels 13-15 use the industry map, every site spot reachable; ra
     assert.ok(l.sites.some((x) => x.closeAt < l.dayLength - 60), 'L' + l.id + ' plant shutdown');
   }
   assert.equal(LEVELS.find((l) => l.id === 12)!.unlock.name, 'עיר התעשייה');
-  assert.equal(LEVELS.find((l) => l.id === 15)!.unlock.name, 'בקרוב');
+  assert.equal(LEVELS.find((l) => l.id === 15)!.unlock.name, 'עמק וכפרים');
 });
 test('industry play: bot reaches day end with >=1 star on L13-L15 and uses the dump stations', () => {
   const save: Save = { coins: 0, level: 13, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
@@ -537,5 +538,39 @@ test('industry play: bot reaches day end with >=1 star on L13-L15 and uses the d
     console.log('L' + l.id, JSON.stringify(r), 'dumps', dumped);
     assert.ok(r.stars >= 1, 'L' + l.id);
     assert.ok(dumped >= 1, 'L' + l.id + ' dumps');
+  }
+});
+const valley = cityValley as unknown as CityMap;
+test('valley: dirt roads dominate, one paved main road, every spot reachable', () => {
+  assert.equal(valley.id, 'city-valley');
+  assert.ok(valley.edges.filter((e) => e.kind === 'sand').length > valley.edges.filter((e) => e.kind === 'main').length);
+  for (const p of valley.spots) assert.ok(route(valley, valley.depotNodeId, p.nodeId).length > 1, p.id);
+});
+test('valley: levels 16-18 use the valley map with small trucks only; L18 unlock = soon', () => {
+  const lv = LEVELS.filter((l) => l.city === 'city-valley');
+  assert.deepEqual(lv.map((l) => l.id), [16, 17, 18]);
+  for (const l of lv) {
+    assert.ok(l.maxTank && l.maxTank <= UPGRADES.find((u) => u.id === 'tank')!.values[0], 'L' + l.id);
+    for (const st of l.sites) assert.ok(valley.spots.some((p) => p.id === st.spotId), st.spotId);
+  }
+  assert.equal(LEVELS.find((l) => l.id === 18)!.unlock.name, 'בקרוב');
+});
+test('small truck: level maxTank caps a bought big tank; no maxTank = bought tank (neg control)', () => {
+  const save: Save = { coins: 0, level: 16, stars: {}, upgrades: { pump: 0, tank: 3, cabin: 0 } };
+  const big = UPGRADES.find((u) => u.id === 'tank')!.values[3];
+  const l16 = LEVELS.find((l) => l.id === 16)!;
+  assert.equal(createDay(l16, valley, save).trucks[0].tankCap, l16.maxTank);
+  assert.equal(createDay({ ...l16, maxTank: undefined }, valley, save).trucks[0].tankCap, big);
+  assert.ok(big > l16.maxTank!);
+});
+test('valley play: bot reaches day end with >=1 star on L16-L18 even with the small truck', () => {
+  const save: Save = { coins: 0, level: 16, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
+  for (const l of LEVELS.filter((x) => x.city === 'city-valley')) {
+    const s = createDay(l, valley, { ...save, level: l.id });
+    let n = 0;
+    while (!s.over) { if (n++ % 15 === 0) botAct(s); step(s, DT); }
+    const r = dayResult(s);
+    console.log('L' + l.id, JSON.stringify(r));
+    assert.ok(r.stars >= 1, 'L' + l.id);
   }
 });
