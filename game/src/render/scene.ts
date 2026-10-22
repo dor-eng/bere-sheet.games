@@ -1,84 +1,93 @@
-// Static scene: ground, blocks, roads, depot, decor (one container, built once, never touched per frame) + site pads.
-import { Container, Graphics } from 'pixi.js';
+// Static scene (iso): painted background sprite + optional procedural roads; depot/decor returned as y-sortable things; site pads.
+import { Container, Graphics, Sprite } from 'pixi.js';
 import type { CityMap, SiteSpot, SiteType } from '../sim/types.ts';
-import { art, INK } from './assets.ts';
+import { art, INK, realSprite, realTex } from './assets.ts';
+import { iso, isoRect, ISO_W, ISO_H } from './iso.ts';
 
-export const GROUND = 0x9fdc86;
+export const GROUND = 0xc4b89c;
+/** Fallback: draw the procedural ground/roads over the painted background (if its painted roads drift from the graph). */
+export const DRAW_ROADS = false;
 const ROAD_W = { main: 64, street: 42 } as const;
 
-export function buildStatic(map: CityMap): Container {
-  const root = new Container();
-  const g = new Graphics();
-  root.addChild(g);
-  g.rect(-400, -400, map.width + 800, map.height + 800).fill({ color: 0x86c96f }); // beyond-map border
-  g.rect(0, 0, map.width, map.height).fill({ color: GROUND });
-  for (let y = 0; y < map.height; y += 160) g.rect(0, y, map.width, 80).fill({ color: 0xa6e08d }); // lawn stripes
-  g.rect(0, 0, map.width, map.height).stroke({ width: 8, color: INK });
-
-  // blocks between grid lines
+function drawRoads(g: Graphics, map: CityMap) {
+  g.poly(isoRect(0, 0, map.width, map.height)).fill({ color: 0x9fb98a });
   const xs = [...new Set(map.nodes.map((n) => n.x))].sort((a, b) => a - b);
   const ys = [...new Set(map.nodes.map((n) => n.y))].sort((a, b) => a - b);
   for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < ys.length - 1; j++) {
     const m = 16;
-    g.roundRect(xs[i] + m, ys[j] + m, xs[i + 1] - xs[i] - 2 * m, ys[j + 1] - ys[j] - 2 * m, 22)
-      .fill({ color: 0xeee8d6 }).stroke({ width: 3, color: 0xb9b19a });
+    g.poly(isoRect(xs[i] + m, ys[j] + m, xs[i + 1] - m, ys[j + 1] - m)).fill({ color: 0xd9d1bb }).stroke({ width: 3, color: 0xb9b19a });
   }
-
   const node = new Map(map.nodes.map((n) => [n.id, n]));
-  // driveways (depot, sites)
+  const seg = (ax: number, ay: number, bx: number, by: number, w: number) => {
+    const h = w / 2;
+    return isoRect(Math.min(ax, bx) - h, Math.min(ay, by) - h, Math.max(ax, bx) + h, Math.max(ay, by) + h);
+  };
   const dn = node.get(map.depotNodeId)!;
-  const drive = (x: number, y: number, nid: string) => { const n = node.get(nid)!; g.moveTo(x, y).lineTo(n.x, n.y).stroke({ width: 30, color: INK, cap: 'round' }); };
-  drive(map.depot.x, map.depot.y, map.depotNodeId);
-  g.moveTo(map.depot.x, map.depot.y).lineTo(dn.x, dn.y).stroke({ width: 22, color: 0x7a8696, cap: 'round' });
-
-  // roads: outline pass, fill pass, centre dashes on main
-  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: ROAD_W[e.kind] + 8, color: INK, cap: 'round' }); }
-  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: ROAD_W[e.kind], color: e.kind === 'main' ? 0x5d6877 : 0x7a8696, cap: 'round' }); }
+  g.poly(seg(map.depot.x, map.depot.y, dn.x, dn.y, 26)).fill({ color: 0x55606c });
+  for (const e of map.edges) { const a = node.get(e.a)!, b = node.get(e.b)!; g.poly(seg(a.x, a.y, b.x, b.y, ROAD_W[e.kind])).fill({ color: e.kind === 'main' ? 0x3e434a : 0x4d535b }); }
   for (const e of map.edges) {
+    if (e.kind !== 'main') continue;
     const a = node.get(e.a)!, b = node.get(e.b)!;
     const len = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
-    const [on, off] = e.kind === 'main' ? [26, 22] : [12, 22];
-    for (let d = 30; d + on < len - 30; d += on + off)
-      g.moveTo(a.x + ux * d, a.y + uy * d).lineTo(a.x + ux * (d + on), a.y + uy * (d + on)).stroke({ width: e.kind === 'main' ? 4 : 3, color: e.kind === 'main' ? 0xffffff : 0xdfe6ee });
+    for (let d = 30; d + 26 < len - 30; d += 48) {
+      const p = iso(a.x + ux * d, a.y + uy * d), q = iso(a.x + ux * (d + 26), a.y + uy * (d + 26));
+      g.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 3, color: 0xe8e4d8, alpha: 0.8 });
+    }
   }
-
-  // depot + decor, depth-sorted
-  const things = new Container(); things.sortableChildren = true; root.addChild(things);
-  const dep = art('depot'); dep.position.set(map.depot.x, map.depot.y + 40); dep.zIndex = map.depot.y + 40; things.addChild(dep);
-  for (const d of map.decor) {
-    const a = art(d.key, d.scale ?? 1); a.position.set(d.x, d.y); a.zIndex = d.y; things.addChild(a);
-  }
-  return root;
 }
 
-export interface Pad { c: Container; w: number; h: number; cx: number; cy: number }
+/** Ground layer (under everything) + depot/decor as separate containers for the y-sorted dynamic layer. */
+export function buildStatic(map: CityMap): { ground: Container; things: Container[] } {
+  const ground = new Container();
+  const t = realTex('bg');
+  if (t) { const bg = new Sprite(t); bg.width = ISO_W; bg.height = ISO_H; ground.addChild(bg); } // any pixel size, stretched
+  else { const g = new Graphics(); g.rect(0, 0, ISO_W, ISO_H).fill({ color: GROUND }); ground.addChild(g); }
+  if (DRAW_ROADS || !t) { const g = new Graphics(); drawRoads(g, map); ground.addChild(g); }
 
-/** Pad under a site's cabin slots (construction yard / wedding lawn). */
+  const things: Container[] = [];
+  const dp = iso(map.depot.x, map.depot.y + 40);
+  const prop = realSprite('prop-depot', 0.5, 0.85, { w: 300 });
+  const dep = new Container(); dep.addChild(prop ?? art('depot')); dep.position.set(dp.x, dp.y); dep.zIndex = dp.y; things.push(dep);
+  for (const d of map.decor) {
+    const p = iso(d.x, d.y);
+    const a = art(d.key, d.scale ?? 1); a.position.set(p.x, p.y); a.zIndex = p.y; things.push(a);
+  }
+  return { ground, things };
+}
+
+/** World-space rect (cx, cy, w, h) + projected container. */
+export interface Pad { c: Container; w: number; h: number; cx: number; cy: number; x0: number; y0: number; x1: number; y1: number }
+
+/** Pad under a site's cabin slots (construction yard / wedding lawn), projected to an iso diamond. */
 export function buildPad(spot: SiteSpot, type: SiteType, node?: { x: number; y: number }): Pad {
   const xs = [spot.x, ...spot.slots.map((s) => s.x)], ys = [Math.min(...spot.slots.map((s) => s.y)) - 120, ...spot.slots.map((s) => s.y)];
   const x0 = Math.min(...xs) - 20, x1 = Math.max(...xs) + 20, y0 = Math.min(...ys), y1 = Math.max(...ys) + 28;
   const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   const c = new Container();
   const g = new Graphics(); c.addChild(g);
-  if (node) { // driveway to the road
-    g.moveTo(spot.x, spot.y).lineTo(node.x, node.y).stroke({ width: 30, color: INK, cap: 'round' });
-    g.moveTo(spot.x, spot.y).lineTo(node.x, node.y).stroke({ width: 22, color: 0x7a8696, cap: 'round' });
+  if (node && DRAW_ROADS) {
+    const hw = 13;
+    g.poly(isoRect(Math.min(spot.x, node.x) - hw, Math.min(spot.y, node.y) - hw, Math.max(spot.x, node.x) + hw, Math.max(spot.y, node.y) + hw)).fill({ color: 0x55606c });
   }
   const con = type === 'construction';
-  g.roundRect(x0, y0, w, h, 18).fill({ color: con ? 0xdcbc82 : 0xcff0a8 }).stroke({ width: 4, color: INK });
-  // border dashes: hazard stripes (construction) / bunting dots (wedding)
+  g.poly(isoRect(x0, y0, x1, y1)).fill({ color: con ? 0xb7956a : 0xcfe8a8, alpha: con ? 0.55 : 0.45 }).stroke({ width: 3, color: con ? 0x6b5233 : 0xffffff, alpha: 0.7 });
+  // border dots: hazard (construction) / bunting (wedding), projected along the rect edges
   const per = 2 * (w + h), step = 26;
   for (let d = 0; d < per; d += step) {
     let x: number, y: number;
     if (d < w) { x = x0 + d; y = y0; } else if (d < w + h) { x = x1; y = y0 + d - w; } else if (d < 2 * w + h) { x = x1 - (d - w - h); y = y1; } else { x = x0; y = y1 - (d - 2 * w - h); }
-    if (con) g.circle(x, y, 5).fill({ color: (d / step) % 2 ? 0xffc83d : INK });
-    else g.circle(x, y, 5).fill({ color: [0xf48fb1, 0xffffff, 0x7fd0ff][(d / step) % 3 | 0] });
+    const p = iso(x, y);
+    if (con) g.ellipse(p.x, p.y, 5, 3).fill({ color: (d / step) % 2 ? 0xffc83d : INK });
+    else g.ellipse(p.x, p.y, 5, 3).fill({ color: [0xf48fb1, 0xffffff, 0x7fd0ff][(d / step) % 3 | 0] });
   }
-  if (con) {
-    const crane = art('crane'); crane.position.set(x1 - 28, y0 + 70); c.addChild(crane);
+  const back = iso(cx, y0 + 50);
+  const prop = realSprite(con ? 'prop-construction' : 'prop-wedding', 0.5, 0.85, { w: 200 });
+  if (prop) { prop.position.set(back.x, back.y); c.addChild(prop); }
+  else if (con) {
+    const cp = iso(x1 - 28, y0 + 70); const crane = art('crane'); crane.position.set(cp.x, cp.y); c.addChild(crane);
   } else {
-    const arch = art('wedding-arch'); arch.position.set(spot.x, y0 + 80); c.addChild(arch);
-    for (const dx of [-70, 70]) { const t = art('wedding-table'); t.position.set(spot.x + dx, y0 + 80); c.addChild(t); }
+    const ap = iso(spot.x, y0 + 80); const arch = art('wedding-arch'); arch.position.set(ap.x, ap.y); c.addChild(arch);
+    for (const dx of [-70, 70]) { const tp = iso(spot.x + dx, y0 + 80); const t = art('wedding-table'); t.position.set(tp.x, tp.y); c.addChild(t); }
   }
-  return { c, w, h, cx, cy };
+  return { c, w, h, cx, cy, x0, y0, x1, y1 };
 }

@@ -1,5 +1,5 @@
 // Integration (manager-owned): game loop wiring sim -> render -> ui.
-import type { GameState, Save, CityMap } from './sim/types.ts';
+import type { GameState, GameEvent, Save, CityMap } from './sim/types.ts';
 import { createDay, step, command, dayResult, applyResult, buyUpgrade, LEVELS, newSave } from './sim/index.ts';
 import { createRender } from './render/index.ts';
 import { createUi } from './ui/index.ts';
@@ -25,8 +25,9 @@ ui.mount(document.getElementById('ui')!, {
   setSpeed: (x) => { speed = x; },
   focus: (x, y) => render.focus(x, y),
 });
+ui.setView((x, y) => render.view(x, y)); // world -> screen, enables off-screen edge arrows
 ui.showDayStart(level(), save);
-(window as any).__game = { get state() { return state; }, get save() { return save; }, command: (c: any) => command(state, c) }; // test hook
+(window as any).__game = { get state() { return state; }, get save() { return save; }, command: (c: any) => command(state, c), focus: (x: number, y: number) => render.focus(x, y) }; // test hook
 
 let last = performance.now();
 const STEP = 1 / 30;
@@ -35,7 +36,9 @@ function frame(now: number) {
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
   if (running) {
     acc += dt * speed;
-    while (acc >= STEP && !state.over) { step(state, STEP); acc -= STEP; }
+    const evs: GameEvent[] = []; // step() keeps only its own events: hand render/ui every event of this frame
+    while (acc >= STEP && !state.over) { step(state, STEP); acc -= STEP; evs.push(...state.events); }
+    state.events = evs;
     if (state.over) {
       running = false; acc = 0;
       const r = dayResult(state);

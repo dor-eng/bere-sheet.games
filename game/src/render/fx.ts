@@ -30,13 +30,26 @@ export class FxLayer {
       this.list.push({ c: g, t: -i * 0.35, dur: 0.7, run: (c, k) => { c.scale.set(1 + k * 0.14); c.alpha = 1 - k; } });
     }
   }
-  dust(x: number, y: number, angle: number) {
-    for (let i = 0; i < 4; i++) {
+  /** dust behind a truck: (x, y) = projected ground point, angle = projected heading (rad); n puffs, k = size */
+  /** red flash over a projected polygon (flat points, absolute coords) */
+  flashPoly(pts: number[]) {
+    const n = pts.length / 2; let cx = 0, cy = 0;
+    for (let i = 0; i < n; i++) { cx += pts[2 * i] / n; cy += pts[2 * i + 1] / n; }
+    const rel = pts.map((v, i) => v - (i % 2 ? cy : cx));
+    for (let i = 0; i < 2; i++) {
+      const g = new Graphics(); g.position.set(cx, cy);
+      g.poly(rel).fill({ color: 0xe5484d, alpha: 0.28 }).stroke({ width: 8, color: 0xe5484d, join: 'round' });
+      this.layer.addChild(g);
+      this.list.push({ c: g, t: -i * 0.35, dur: 0.7, run: (c, k) => { c.scale.set(1 + k * 0.14); c.alpha = 1 - k; } });
+    }
+  }
+  dust(x: number, y: number, angle: number, n = 4, k = 1, back = 50) {
+    for (let i = 0; i < n; i++) {
       const c = new Container();
       c.addChild(art('fx-dust'));
-      const bx = x - Math.cos(angle) * (50 + i * 10), by = y + 16 - Math.sin(angle) * (50 + i * 10);
+      const bx = x - Math.cos(angle) * (back + i * 10) + (Math.random() - 0.5) * 8, by = y + 2 - Math.sin(angle) * (back + i * 10);
       c.position.set(bx, by);
-      this.list.push({ c, t: -i * 0.08, dur: 0.6, run: (c, k) => { c.scale.set(0.4 + k * 0.9); c.y = by - k * 18; c.alpha = 0.85 * (1 - k); } });
+      this.list.push({ c, t: -i * 0.08, dur: 0.6 + 0.2 * k, run: (c, q) => { c.scale.set((0.4 + q * 0.9) * k); c.y = by - q * 14; c.alpha = 0.7 * (1 - q); } });
       this.layer.addChild(c);
     }
   }

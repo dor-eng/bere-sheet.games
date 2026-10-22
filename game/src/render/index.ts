@@ -1,27 +1,36 @@
-// PixiJS 8 map renderer. Reads GameState only. Contract: src/sim/types.ts (RenderApi).
-import { Application, Container, Graphics } from 'pixi.js';
+// PixiJS 8 map renderer, isometric. Reads GameState only. Contract: src/sim/types.ts (RenderApi).
+// Sim is in world px (1000 x 1600); everything drawn goes through iso() into the 2600 x 1733 projected canvas.
+import { Application, Container, Graphics, Sprite } from 'pixi.js';
 import type { CityMap, GameState, RenderApi, Selection, SiteDef, SiteSpot, Truck } from '../sim/types.ts';
-import { art, loadAssets, personArt, INK } from './assets.ts';
+import { art, loadAssets, loadReal, personArt, realSprite, INK } from './assets.ts';
 import { Camera, bindGestures } from './camera.ts';
 import { FxLayer } from './fx.ts';
+import { iso, isoRect, unIso, ISO_W, ISO_H } from './iso.ts';
 import { buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
 
 const gaugeColor = (r: number) => (r < 0.6 ? 0x3dd68c : r < 0.85 ? 0xffb020 : 0xe5484d);
-const lerpAngle = (a: number, b: number, k: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
+const TRUCK_W = 125, CABIN_H = 40, PERSON_H = 28;
 
-// ---- cabin view: body + vertical fill gauge on its front + pulse ring ----
-interface CabinView { c: Container; gauge: Graphics; ring: Graphics; q: number; full: boolean; x: number; y: number }
+/** soft contact shadow: stacked translucent ellipses, light from screen upper-left -> offset lower-right */
+function shadow(rx: number, ry: number): Graphics {
+  const g = new Graphics();
+  for (const k of [1, 0.78, 0.55]) g.ellipse(rx * 0.12, ry * 0.15, rx * k, ry * k).fill({ color: 0x1a1408, alpha: 0.11 });
+  return g;
+}
+
+// ---- cabin view: sprite + fill gauge above the roof + red pulse ring on the ground ----
+interface CabinView { c: Container; gauge: Graphics; ring: Graphics; q: number }
 function makeCabin(): CabinView {
   const c = new Container();
-  c.addChild(art('cabin'));
-  const gauge = new Graphics(); gauge.position.set(0, 0); c.addChild(gauge);
-  const ring = new Graphics(); ring.roundRect(-25, -58, 50, 64, 12).fill({ color: 0xe5484d, alpha: 0.25 }).stroke({ width: 5, color: 0xe5484d });
-  ring.visible = false; c.addChildAt(ring, 0);
-  return { c, gauge, ring, q: -1, full: false, x: 0, y: 0 };
+  const ring = new Graphics(); ring.ellipse(0, 0, 26, 13).fill({ color: 0xe5484d, alpha: 0.3 }).stroke({ width: 5, color: 0xe5484d });
+  ring.visible = false;
+  c.addChild(ring, shadow(18, 8), realSprite('cabin', 0.5, 0.97, { h: CABIN_H }) ?? art('cabin', 0.8));
+  const gauge = new Graphics(); c.addChild(gauge);
+  return { c, gauge, ring, q: -1 };
 }
 function drawCabinGauge(g: Graphics, ratio: number) {
   g.clear();
-  const h = 30, w = 11, x = -w / 2, y = -42;
+  const h = 24, w = 11, x = -w / 2, y = -CABIN_H - 8 - h;
   g.roundRect(x, y, w, h, 5).fill({ color: 0xffffff }).stroke({ width: 3, color: INK });
   const fh = Math.max(0, Math.min(1, ratio)) * (h - 4);
   if (fh > 0) g.roundRect(x + 2, y + h - 2 - fh, w - 4, fh, 2).fill({ color: gaugeColor(ratio) });
@@ -31,8 +40,17 @@ function drawCabinGauge(g: Graphics, ratio: number) {
   }
 }
 
-// ---- truck view ----
-interface TruckView { c: Container; body: Container; gauge: Graphics; x: number; y: number; a: number; job: string; q: number; init: boolean }
+// ---- truck view: 4 diagonal sprites, one visible ----
+type Dir = 'dl' | 'dr' | 'ul' | 'ur';
+const ANCHOR: Record<Dir, [number, number]> = { dr: [0.45, 0.68], ul: [0.47, 0.66], dl: [0.55, 0.68], ur: [0.53, 0.66] };
+interface TruckView {
+  c: Container; body: Container; views: Partial<Record<Dir, Sprite>>; gauge: Graphics; topY: number;
+  x: number; y: number; a: number; px: number; py: number; dir: Dir; job: string; q: number; spd: number; dustT: number;
+}
+/** world heading -> screen diagonal: +x DR, -x UL, +y DL, -y UR */
+const dirOf = (a: number): Dir => { const c = Math.cos(a), s = Math.sin(a); return Math.abs(c) >= Math.abs(s) ? (c > 0 ? 'dr' : 'ul') : (s > 0 ? 'dl' : 'ur'); };
+/** world heading -> projected screen angle */
+const screenAngle = (a: number) => { const c = Math.cos(a), s = Math.sin(a); return Math.atan2((c + s) / 2, c - s); };
 function drawTankGauge(g: Graphics, ratio: number) {
   g.clear();
   const w = 54, h = 11;
@@ -42,8 +60,8 @@ function drawTankGauge(g: Graphics, ratio: number) {
 }
 
 // ---- people ----
-interface Person { c: Container; x: number; y: number; hx: number; hy: number; st: 'idle' | 'toCabin' | 'inside' | 'back'; t: number; tx: number; ty: number; ph: number }
-interface SiteView { def: SiteDef; spot: SiteSpot; pad: Pad; people: Person[]; maxN: number; flashed: boolean }
+interface Person { c: Container; fig: Container; x: number; y: number; hx: number; hy: number; st: 'idle' | 'toCabin' | 'inside' | 'back'; t: number; tx: number; ty: number; ph: number }
+interface SiteView { def: SiteDef; spot: SiteSpot; pad: Pad; people: Person[]; maxN: number }
 
 function usageRate(def: SiteDef, time: number): number {
   const u = def.usage; if (!u.length) return 0;
@@ -53,7 +71,12 @@ function usageRate(def: SiteDef, time: number): number {
   return u[u.length - 1][1];
 }
 
-export function createRender(): RenderApi {
+export interface RenderExtra {
+  /** world -> canvas css px (for ui.setView edge arrows) */
+  view(x: number, y: number): { x: number; y: number } | null;
+}
+
+export function createRender(): RenderApi & RenderExtra {
   let app: Application, cam: Camera, map: CityMap;
   let world: Container, actors: Container, padLayer: Container;
   const fx = new FxLayer();
@@ -69,13 +92,14 @@ export function createRender(): RenderApi {
   const slotPos = (spot: SiteSpot, slot: number) => spot.slots[slot] ?? { x: spot.x, y: spot.y };
 
   function addPerson(sv: SiteView, i: number): Person {
-    const kind = sv.def.type === 'construction' ? 'worker' : 'guest';
-    const c = personArt(kind, i);
+    const con = sv.def.type === 'construction';
+    const fig = new Container();
+    fig.addChild(realSprite(con ? 'worker' : 'guest', 0.5, 0.97, { h: PERSON_H }) ?? personArt(con ? 'worker' : 'guest', i));
+    const c = new Container(); c.addChild(shadow(9, 4), fig);
     const hx = sv.pad.cx + (Math.random() - 0.5) * (sv.pad.w - 60);
     const hy = sv.spot.y - 30 + Math.random() * 36;
-    c.position.set(hx, hy);
     actors.addChild(c);
-    return { c, x: hx, y: hy, hx, hy, st: 'idle', t: Math.random() * 2, tx: hx, ty: hy, ph: Math.random() * 6 };
+    return { c, fig, x: hx, y: hy, hx, hy, st: 'idle', t: Math.random() * 2, tx: hx, ty: hy, ph: Math.random() * 6 };
   }
 
   function stepPeople(sv: SiteView, s: GameState, dt: number, open: boolean) {
@@ -92,8 +116,8 @@ export function createRender(): RenderApi {
     for (const p of sv.people) {
       p.t -= dt;
       if (p.st === 'idle' && p.t <= 0) {
-        if (mine.length && open) { const cb2 = mine[(Math.random() * mine.length) | 0]; const sp = slotPos(sv.spot, cb2.slot); p.tx = sp.x; p.ty = sp.y + 6; p.st = 'toCabin'; }
-        else p.t = 1 + Math.random() * 2;
+        if (mine.length && open && Math.random() < 0.6) { const cb2 = mine[(Math.random() * mine.length) | 0]; const sp = slotPos(sv.spot, cb2.slot); p.tx = sp.x; p.ty = sp.y + 6; p.st = 'toCabin'; }
+        else { p.tx = p.hx + (Math.random() - 0.5) * 50; p.ty = p.hy + (Math.random() - 0.5) * 24; p.st = 'back'; } // short stroll near home
       }
       if (p.st === 'toCabin' || p.st === 'back') {
         const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy), step = 46 * dt;
@@ -101,11 +125,18 @@ export function createRender(): RenderApi {
           p.x = p.tx; p.y = p.ty;
           if (p.st === 'toCabin') { p.st = 'inside'; p.t = 1 + Math.random() * 1.5; p.c.visible = false; }
           else { p.st = 'idle'; p.t = 1.5 + Math.random() * 4; }
-        } else { p.x += (dx / d) * step; p.y += (dy / d) * step; if (Math.abs(dx) > 1) p.c.scale.x = dx > 0 ? 1 : -1; }
+        } else {
+          p.x += (dx / d) * step; p.y += (dy / d) * step;
+          const sdx = dx - dy; // projected screen dx
+          if (Math.abs(sdx) > 1) p.fig.scale.x = sdx > 0 ? 1 : -1;
+        }
       } else if (p.st === 'inside' && p.t <= 0) { p.c.visible = true; p.st = 'back'; p.tx = p.hx; p.ty = p.hy; }
       const moving = p.st === 'toCabin' || p.st === 'back';
-      p.c.position.set(p.x, p.y + (moving ? -Math.abs(Math.sin(clock * 12 + p.ph)) * 3 : 0));
-      p.c.zIndex = p.y;
+      const q = iso(p.x, p.y);
+      p.c.position.set(q.x, q.y);
+      p.fig.y = moving ? -Math.abs(Math.sin(clock * 12 + p.ph)) * 1.8 : 0;
+      p.fig.rotation = moving ? Math.sin(clock * 12 + p.ph) * 0.05 : Math.sin(clock * 1.7 + p.ph) * 0.035; // walk wobble / idle sway
+      p.c.zIndex = q.y;
     }
   }
 
@@ -116,7 +147,7 @@ export function createRender(): RenderApi {
     const spot = map.spots.find((p) => p.id === st.def.spotId); if (!spot) return undefined;
     const pad = buildPad(spot, st.def.type, map.nodes.find((n) => n.id === spot.nodeId));
     padLayer.addChild(pad.c);
-    sv = { def: st.def, spot, pad, people: [], maxN: st.def.type === 'construction' ? 6 : 10, flashed: false };
+    sv = { def: st.def, spot, pad, people: [], maxN: st.def.type === 'construction' ? 6 : 10 };
     sites.set(st.def.id, sv);
     return sv;
   }
@@ -125,46 +156,64 @@ export function createRender(): RenderApi {
     for (const e of s.events) {
       if (e.kind === 'cabinEmptied') {
         const sv = sites.get(e.siteId); const cabin = s.cabins.find((c) => c.id === e.cabinId);
-        if (sv && cabin) { const p = slotPos(sv.spot, cabin.slot); fx.splash(p.x, p.y); }
+        if (sv && cabin) { const sp = slotPos(sv.spot, cabin.slot); const p = iso(sp.x, sp.y); fx.splash(p.x, p.y - CABIN_H / 2); }
       } else if (e.kind === 'paid') {
-        const sv = sites.get(e.siteId); if (sv) fx.coin(sv.pad.cx, sv.pad.cy - sv.pad.h / 2, e.amount);
+        const sv = sites.get(e.siteId); if (sv) { const p = iso(sv.pad.cx, sv.pad.y0); fx.coin(p.x, p.y - 30, e.amount); }
       } else if (e.kind === 'overflowStart') {
-        const sv = sites.get(e.siteId); if (sv) fx.flash(sv.pad.cx, sv.pad.cy, sv.pad.w + 10, sv.pad.h + 10);
+        const sv = sites.get(e.siteId); if (sv) fx.flashPoly(isoRect(sv.pad.x0 - 5, sv.pad.y0 - 5, sv.pad.x1 + 5, sv.pad.y1 + 5));
       }
     }
   }
 
+  function makeTruck(t: Truck): TruckView {
+    const c = new Container(); const body = new Container(); const views: TruckView['views'] = {};
+    let topY = -70;
+    for (const d of ['dl', 'dr', 'ul', 'ur'] as Dir[]) {
+      const s = realSprite(`truck-${d}`, ANCHOR[d][0], ANCHOR[d][1], { w: TRUCK_W });
+      if (s) { s.visible = false; views[d] = s; body.addChild(s); topY = Math.min(topY, -s.height * ANCHOR[d][1]); }
+    }
+    if (!Object.keys(views).length) body.addChild(art('truck', 0.85)); // placeholder, no sprites
+    const gauge = new Graphics(); gauge.position.set(0, topY - 18);
+    c.addChild(shadow(62, 28), body, gauge); actors.addChild(c);
+    const p = iso(t.x, t.y);
+    return { c, body, views, gauge, topY, x: t.x, y: t.y, a: t.angle, px: p.x, py: p.y, dir: dirOf(t.angle), job: t.job, q: -1, spd: 0, dustT: 0 };
+  }
+
   function updateTruck(t: Truck, dt: number) {
     let v = trucks.get(t.id);
-    if (!v) {
-      const c = new Container(); const body = art('truck'); const gauge = new Graphics();
-      c.addChild(body); gauge.position.set(0, -58); c.addChild(gauge); actors.addChild(c);
-      v = { c, body, gauge, x: t.x, y: t.y, a: t.angle, job: t.job, q: -1, init: true };
-      trucks.set(t.id, v);
-    }
+    if (!v) { v = makeTruck(t); trucks.set(t.id, v); }
     const dist = Math.hypot(t.x - v.x, t.y - v.y);
     const k = dist > 250 ? 1 : 1 - Math.exp(-dt * 22);
+    const ox = v.x, oy = v.y;
     v.x += (t.x - v.x) * k; v.y += (t.y - v.y) * k;
-    if (dist > 0.5) v.a = lerpAngle(v.a, t.angle, 1 - Math.exp(-dt * 16));
+    const moved = Math.hypot(v.x - ox, v.y - oy);
+    v.spd += ((dt > 0 ? moved / dt : 0) - v.spd) * Math.min(1, dt * 10);
+    if (dist > 0.5) { v.a = t.angle; v.dir = dirOf(t.angle); }
+    const sa = screenAngle(v.a);
+    const driving = v.spd > 8 && moved < 200;
     if (t.job !== v.job) {
-      if (v.job === 'idle' || v.job === 'pumping' || v.job === 'dumping') if (t.job === 'toSite' || t.job === 'toDepot' || t.job === 'delivering') fx.dust(v.x, v.y, v.a);
+      if ((v.job === 'idle' || v.job === 'pumping' || v.job === 'dumping') && (t.job === 'toSite' || t.job === 'toDepot' || t.job === 'delivering')) fx.dust(v.px, v.py, sa);
       v.job = t.job;
     }
-    // never upside down: if heading left, mirror the sprite and rotate relative to the left direction
-    const left = Math.cos(v.a) < 0;
-    v.body.scale.x = left ? -1 : 1;
-    v.body.rotation = left ? v.a - Math.PI : v.a;
-    v.c.position.set(v.x, v.y);
-    v.c.zIndex = v.y + 20;
+    for (const d of Object.keys(v.views) as Dir[]) v.views[d]!.visible = d === v.dir;
+    const p = iso(v.x, v.y); v.px = p.x; v.py = p.y;
+    // life: suspension bob while driving, small shake while pumping / dumping
+    if (t.job === 'pumping' || t.job === 'dumping') v.body.position.set(Math.sin(clock * 53) * 0.9, Math.cos(clock * 41) * 0.6);
+    else if (driving) v.body.position.set(0, Math.sin(clock * 11) * 1.1 + Math.sin(clock * 17.3) * 0.4);
+    else v.body.position.set(0, 0);
+    if (driving) { v.dustT -= dt; if (v.dustT <= 0) { v.dustT = 0.22; fx.dust(v.px, v.py, sa, 1, 0.55, 48); } }
+    v.c.position.set(v.px, v.py);
+    v.c.zIndex = v.py + 4;
     const q = Math.round((t.tank / Math.max(1, t.tankCap)) * 40);
     if (q !== v.q) { v.q = q; drawTankGauge(v.gauge, q / 40); }
   }
 
   function hit(px: number, py: number): Selection {
-    const w = cam.toWorld(px, py);
+    const P = cam.toWorld(px, py); // projected canvas coords
+    const w = unIso(P.x, P.y); // world coords
     const fingerR = Math.max(60, 26 / cam.scale); // >= ~26 css px radius
     let best: Selection = null, bd = Infinity;
-    for (const [id, v] of trucks) { const d = Math.hypot(v.x - w.x, v.y - w.y); if (d < fingerR + 20 && d < bd) { bd = d; best = { kind: 'truck', id }; } }
+    for (const [id, v] of trucks) { const d = Math.hypot(v.px - P.x, v.py - 28 - P.y); if (d < fingerR + 20 && d < bd) { bd = d; best = { kind: 'truck', id }; } }
     if (best) return best;
     for (const [id, sv] of sites) {
       const p = sv.pad, pad = Math.max(0, fingerR - 40);
@@ -178,33 +227,45 @@ export function createRender(): RenderApi {
     sel.clear();
     if (!selected) return;
     const pulse = 1 + Math.sin(clock * 6) * 0.04;
+    if (selected.kind === 'site') {
+      const sv = sites.get(selected.id); if (!sv) return;
+      const m = 14 * pulse, p = sv.pad;
+      const pts = isoRect(p.x0 - m, p.y0 - m, p.x1 + m, p.y1 + m);
+      sel.poly(pts).stroke({ width: 10, color: INK, join: 'round' }).poly(pts).stroke({ width: 5, color: 0xffffff, join: 'round' });
+      return;
+    }
     let x = 0, y = 0, rx = 0, ry = 0;
-    if (selected.kind === 'truck') { const v = trucks.get(selected.id); if (!v) return; x = v.x; y = v.y + 8; rx = 90; ry = 44; }
-    else if (selected.kind === 'site') { const sv = sites.get(selected.id); if (!sv) return; x = sv.pad.cx; y = sv.pad.cy; rx = sv.pad.w / 2 + 14; ry = sv.pad.h / 2 + 14; }
-    else { x = map.depot.x; y = map.depot.y - 20; rx = 150; ry = 90; }
+    if (selected.kind === 'truck') { const v = trucks.get(selected.id); if (!v) return; x = v.px; y = v.py + 4; rx = 78; ry = 38; }
+    else { const p = iso(map.depot.x, map.depot.y + 20); x = p.x; y = p.y; rx = 160; ry = 80; }
     sel.ellipse(x, y, rx * pulse, ry * pulse).stroke({ width: 10, color: INK }).ellipse(x, y, rx * pulse, ry * pulse).stroke({ width: 5, color: 0xffffff });
   }
 
-  const api: RenderApi = {
+  const api: RenderApi & RenderExtra = {
     async mount(el, m) {
       map = m;
       app = new Application();
       await app.init({ resizeTo: el, resolution: Math.min(3, window.devicePixelRatio || 1), autoDensity: true, antialias: true, background: GROUND, preference: 'webgl' });
       el.appendChild(app.canvas);
       app.canvas.style.display = 'block';
-      await loadAssets();
+      await Promise.all([loadAssets(), loadReal()]);
       world = new Container();
       padLayer = new Container(); actors = new Container(); actors.sortableChildren = true;
-      world.addChild(buildStatic(map), padLayer, sel, actors, fx.layer);
+      const st = buildStatic(map);
+      for (const t of st.things) actors.addChild(t);
+      world.addChild(st.ground, padLayer, sel, actors, fx.layer);
       app.stage.addChild(world);
-      cam = new Camera(world, map.width, map.height);
+      cam = new Camera(world, ISO_W, ISO_H);
       cam.resize(el.clientWidth || app.screen.width, el.clientHeight || app.screen.height);
-      // portrait phone: start at the top-left-ish overview, fit to width
       app.renderer.on('resize', (w: number, h: number) => cam.resize(w, h));
       bindGestures(app.canvas, cam, (px, py) => { selected = hit(px, py); cb(selected); });
     },
     onSelect(f) { cb = f; },
-    focus(x, y) { cam.focus(x, y); },
+    focus(x, y) { if (!cam) return; const p = iso(x, y); cam.focus(p.x, p.y); },
+    view(x, y) {
+      if (!cam) return null;
+      const p = iso(x, y), s = cam.scale;
+      return { x: (p.x - cam.cx) * s + cam.vw / 2, y: (p.y - cam.cy) * s + cam.vh / 2 };
+    },
     update(s, dt) {
       if (!app || !cam) return;
       clock += dt;
@@ -224,14 +285,14 @@ export function createRender(): RenderApi {
         seen.add(c.id);
         let v = cabins.get(c.id);
         if (!v) { v = makeCabin(); cabins.set(c.id, v); actors.addChild(v.c); }
-        const p = slotPos(sv.spot, c.slot);
+        const sp = slotPos(sv.spot, c.slot), p = iso(sp.x, sp.y);
         v.c.position.set(p.x, p.y); v.c.zIndex = p.y;
         const ratio = c.capacity > 0 ? c.fill / c.capacity : 0;
         const q = Math.round(ratio * 20);
         if (q !== v.q) { v.q = q; drawCabinGauge(v.gauge, ratio); }
         const full = ratio >= 0.999;
         v.ring.visible = full;
-        if (full) v.ring.alpha = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(clock * 9));
+        if (full) { const k = 0.5 + 0.5 * Math.sin(clock * 9); v.ring.alpha = 0.45 + 0.55 * k; v.ring.scale.set(1 + 0.15 * k); }
       }
       for (const [id, v] of cabins) if (!seen.has(id)) { v.c.destroy({ children: true }); cabins.delete(id); }
       for (const t of s.trucks) updateTruck(t, dt);
