@@ -319,6 +319,16 @@ test('capital: the 4 checkpoints sit on painted barriers; every spot is reachabl
   }
   const free = route(noCheck, capital.depotNodeId, 'Q2');
   assert.ok(len(free) > len(p)); // the check-free detour is longer
+  // depot->ceremony: the short northern road crosses a checkpoint, so a longer road is faster; mult=1 -> the shortcut wins (negative control)
+  const shortcut = ['D0', 'W0', 'R1', 'X1', 'Q1'];
+  assert.ok(kinds(shortcut).includes('check'));
+  const q1 = route(capital, 'D0', 'Q1');
+  assert.ok(len(q1) > len(shortcut) && pathTime(capital, q1, 110) < pathTime(capital, shortcut, 110), q1.join());
+  const keep = ECON.checkSpeedMult;
+  try {
+    ECON.checkSpeedMult = 1;
+    assert.deepEqual(route(capital, 'D0', 'Q1'), shortcut);
+  } finally { ECON.checkSpeedMult = keep; }
 });
 test('capital: levels 7-9 use the capital map, every site spot reachable from the depot', () => {
   const lv = LEVELS.filter((l) => l.city === 'city-capital');
