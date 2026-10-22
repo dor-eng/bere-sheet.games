@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="28" viewBox="-18 -54 36 58" role="img" aria-label="worker"><title>worker</title><style>.line{stroke:#1E2A3A;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.shadow{fill:#1E2A3A;opacity:.16;stroke:none}.bulb{animation:twinkle 1.9s steps(2,end) infinite}.bulb:nth-of-type(2n){animation-delay:-.7s}.bulb:nth-of-type(3n){animation-delay:-1.3s}.hook{transform-origin:99px 39px;animation:sway 3.2s ease-in-out infinite alternate}@keyframes twinkle{50%{opacity:.45}}@keyframes sway{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}</style><g id="worker" class="line" stroke-width="2.5">
+  <g class="walk-body"><path class="leg-left" d="m-5-10-2 10h-5" fill="none"/><path class="leg-right" d="m5-10 2 10h5" fill="none"/>
+  <path d="m-8-22-6 9m22-9 5 8" fill="none" stroke="#e5a575" stroke-width="6"/>
+  <path d="M-7-27h14l3 17h-20z" fill="#ff9a36"/><path d="M-3-25v13m7-13v13" stroke="#ffed8e" stroke-width="3"/>
+  <circle cy="-35" r="12" fill="#f7bd8b"/><path d="M-12-38q0-14 12-14t12 14z" fill="#FFCC00"/><path d="M-15-37h30M0-49v10" fill="none"/>
+  <path d="M-4-32h.1m8 0h.1" stroke-width="3"/><path d="M-2-27q3 2 5-1" fill="none" stroke-width="1.5"/></g>
+ </g></svg>

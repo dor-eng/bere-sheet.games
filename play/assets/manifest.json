@@ -1,0 +1,247 @@
+{
+  "truck": {
+    "file": "truck.svg",
+    "w": 90,
+    "h": 56,
+    "ax": 0.5,
+    "ay": 0.86
+  },
+  "truck-wheel": {
+    "file": "truck-wheel.svg",
+    "w": 16,
+    "h": 20,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "cabin": {
+    "file": "cabin.svg",
+    "w": 34,
+    "h": 46,
+    "ax": 0.43,
+    "ay": 0.96
+  },
+  "cabin-door-open": {
+    "file": "cabin-door-open.svg",
+    "w": 34,
+    "h": 46,
+    "ax": 0.43,
+    "ay": 0.96
+  },
+  "depot": {
+    "file": "depot.svg",
+    "w": 200,
+    "h": 150,
+    "ax": 0.55,
+    "ay": 0.96
+  },
+  "wash-bay": {
+    "file": "wash-bay.svg",
+    "w": 72,
+    "h": 65,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "site-construction": {
+    "file": "site-construction.svg",
+    "w": 220,
+    "h": 170,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "crane": {
+    "file": "crane.svg",
+    "w": 120,
+    "h": 200,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "site-wedding": {
+    "file": "site-wedding.svg",
+    "w": 220,
+    "h": 170,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "wedding-arch": {
+    "file": "wedding-arch.svg",
+    "w": 86,
+    "h": 92,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "wedding-table": {
+    "file": "wedding-table.svg",
+    "w": 70,
+    "h": 48,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "building-1": {
+    "file": "building-1.svg",
+    "w": 136,
+    "h": 118,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "building-2": {
+    "file": "building-2.svg",
+    "w": 136,
+    "h": 150,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "building-3": {
+    "file": "building-3.svg",
+    "w": 136,
+    "h": 104,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "building-4": {
+    "file": "building-4.svg",
+    "w": 156,
+    "h": 132,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "building-5": {
+    "file": "building-5.svg",
+    "w": 136,
+    "h": 158,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "building-6": {
+    "file": "building-6.svg",
+    "w": 136,
+    "h": 112,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "tree-1": {
+    "file": "tree-1.svg",
+    "w": 58,
+    "h": 78,
+    "ax": 0.44,
+    "ay": 0.85
+  },
+  "tree-2": {
+    "file": "tree-2.svg",
+    "w": 54,
+    "h": 84,
+    "ax": 0.51,
+    "ay": 0.92
+  },
+  "person-1": {
+    "file": "person-1.svg",
+    "w": 16,
+    "h": 28,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "person-2": {
+    "file": "person-2.svg",
+    "w": 16,
+    "h": 28,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "person-3": {
+    "file": "person-3.svg",
+    "w": 16,
+    "h": 28,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "worker": {
+    "file": "worker.svg",
+    "w": 16,
+    "h": 28,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "bride": {
+    "file": "bride.svg",
+    "w": 20,
+    "h": 30,
+    "ax": 0.47,
+    "ay": 0.92
+  },
+  "groom": {
+    "file": "groom.svg",
+    "w": 16,
+    "h": 28,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "icon-coin": {
+    "file": "icon-coin.svg",
+    "w": 64,
+    "h": 64,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "icon-star": {
+    "file": "icon-star.svg",
+    "w": 64,
+    "h": 64,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "icon-pump": {
+    "file": "icon-pump.svg",
+    "w": 64,
+    "h": 64,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "icon-tank": {
+    "file": "icon-tank.svg",
+    "w": 64,
+    "h": 64,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "icon-cabin": {
+    "file": "icon-cabin.svg",
+    "w": 64,
+    "h": 64,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "icon-luxury-trailer": {
+    "file": "icon-luxury-trailer.svg",
+    "w": 64,
+    "h": 64,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "fx-splash": {
+    "file": "fx-splash.svg",
+    "w": 48,
+    "h": 32,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "fx-dust": {
+    "file": "fx-dust.svg",
+    "w": 54,
+    "h": 28,
+    "ax": 0.5,
+    "ay": 0.93
+  },
+  "logo-white": {
+    "file": "logo-white.svg",
+    "w": 64,
+    "h": 54.376,
+    "ax": 0.5,
+    "ay": 1
+  },
+  "logo-navy": {
+    "file": "logo-navy.svg",
+    "w": 64,
+    "h": 54.376,
+    "ax": 0.5,
+    "ay": 1
+  }
+}

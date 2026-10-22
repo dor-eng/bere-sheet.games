@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="28" viewBox="-20 -53 40 57" role="img" aria-label="person-1"><title>person-1</title><style>.line{stroke:#1E2A3A;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.shadow{fill:#1E2A3A;opacity:.16;stroke:none}.bulb{animation:twinkle 1.9s steps(2,end) infinite}.bulb:nth-of-type(2n){animation-delay:-.7s}.bulb:nth-of-type(3n){animation-delay:-1.3s}.hook{transform-origin:99px 39px;animation:sway 3.2s ease-in-out infinite alternate}@keyframes twinkle{50%{opacity:.45}}@keyframes sway{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}</style><g color="#f07d89"><g id="guest" class="line" stroke-width="2.5">
+  <g class="dance-body"><path class="leg-left" d="m-4-9-3 9h-4" fill="none"/><path class="leg-right" d="m4-9 3 9h4" fill="none"/>
+  <path d="m-8-22-7-8m23 8 7-10" fill="none" stroke="#c98b63" stroke-width="6"/>
+  <path d="M-7-26h14l4 17h-22z" fill="currentColor"/><path d="m-3-24 3 4 3-4" fill="#fff6d7" stroke="none"/>
+  <circle cy="-35" r="11" fill="#e8aa7e"/><path d="M-11-37q-2-16 13-12 12 1 9 13l-5-7q-5 6-16 6z" fill="#663d33"/>
+  <path d="M-4-33h.1m8 0h.1" stroke-width="3"/><path d="M-3-28q3 3 6 0" fill="none" stroke-width="1.5"/></g>
+ </g></g></svg>

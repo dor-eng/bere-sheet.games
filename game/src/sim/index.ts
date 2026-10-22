@@ -366,8 +366,9 @@ function totals(s: GameState) {
 export function dayResult(s: GameState): DayResult {
   const { earned, fines, overflowSec } = totals(s);
   const net = earned - fines, target = s.level.coinTarget;
-  let stars = 0;
-  ECON.starFractions.forEach((f, i) => { if (net >= f * target) stars = i + 1; });
+  // design/CONTENT.md: 1 = finished the day in profit, 2 = no overflow, 3 = no overflow + coin target
+  const clean = overflowSec <= ECON.feeOverflowTolerance;
+  const stars = !s.over || net <= 0 ? 0 : !clean ? 1 : net >= target ? 3 : 2; // survived = day ended in profit
   return { levelId: s.level.id, stars: stars as 0 | 1 | 2 | 3, earned, fines, overflowSec, coinTarget: target };
 }
 

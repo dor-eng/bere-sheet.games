@@ -1,0 +1,1 @@
+export{t as CanvasRenderer}from"./CanvasRenderer-BfEgnqt4.js";
