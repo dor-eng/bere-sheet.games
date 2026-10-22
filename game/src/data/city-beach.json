@@ -167,11 +167,6 @@
    "kind": "main"
   },
   {
-   "a": "A1",
-   "b": "P1",
-   "kind": "street"
-  },
-  {
    "a": "P1",
    "b": "B1",
    "kind": "sand"
