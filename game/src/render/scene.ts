@@ -110,9 +110,9 @@ export function buildPad(spot: SiteSpot, type: SiteType, node?: { x: number; y: 
   }
   const back = iso(cx, y0 + 50);
   const painted = !!realTex(bgKey); // construction lots are painted into the background
-  const prop = con ? null : (type === 'beach' && realSprite('prop-beach', 0.5, 0.85, { w: 220 })) || (type === 'ceremony' && realSprite('prop-capital', 0.5, 0.85, { w: 220 })) || (type === 'show' && realSprite('prop-beach', 0.5, 0.85, { w: 220 })) || realSprite('prop-wedding', 0.5, 0.85, { w: 200 });
+  const prop = con ? null : (type === 'beach' && realSprite('prop-beach', 0.5, 0.85, { w: 220 })) || (type === 'ceremony' && realSprite('prop-capital', 0.5, 0.85, { w: 220 })) || (type === 'show' && !painted && realSprite('prop-beach', 0.5, 0.85, { w: 220 })) || (type !== 'show' && realSprite('prop-wedding', 0.5, 0.85, { w: 200 }));
   if (prop) { prop.position.set(back.x, back.y); c.addChild(prop); }
-  else if (con) {
+  else if (con || type === 'show') { // show venues are painted into the background
     if (painted) return { c, w, h, cx, cy, x0, y0, x1, y1 };
     const cp = iso(x1 - 28, y0 + 70); const crane = art('crane'); crane.position.set(cp.x, cp.y); c.addChild(crane);
   } else {
