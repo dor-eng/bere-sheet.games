@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 // DOM Hebrew RTL UI over the canvas. Reads GameState, calls handlers only (no sim logic, no canvas).
+import { LEVELS } from '../sim/index.ts';
 import type { GameState, UiApi, UiHandlers, Selection, LevelDef, Save, DayResult, UpgradeDef, Truck, TruckJob, Cabin } from '../sim/types.ts';
 
 const inDepot = (c: Cabin) => c.siteId === null && c.slot === -1;
@@ -221,12 +222,14 @@ export function createUi(): UiApi & UiExtra {
 
   function showDayEnd(r: DayResult, save: Save, next: LevelDef | undefined) {
     shopSave = JSON.parse(JSON.stringify(save));
+    // a level's unlock describes what the following level brings, so show the one just won
+    const u = r.stars >= 1 ? LEVELS.find((l) => l.id === r.levelId)?.unlock : undefined;
     const stars = [0, 1, 2].map((i) => STAR.replace('<svg', `<svg class="${i < r.stars ? 'on' : ''}" style="--d:${0.3 + i * 0.35}s"`)).join('');
     const msg = r.stars === 3 ? 'מושלם! אלופי השירות!' : r.stars === 2 ? 'יופי של יום!' : r.stars === 1 ? 'סיימנו! אפשר יותר' : 'יום קשה, ננסה שוב';
     showCard(`<h2>${msg}</h2><div class="big-stars">${stars}</div>` +
       `<div class="sum"><div class="pos">הרווחנו<b>+${fmt(r.earned)}</b></div><div class="neg">קנסות<b>−${fmt(r.fines)}</b></div><div>בקופה<b>${fmt(save.coins)}</b></div></div>` +
       (r.stars < 3 ? `<div class="ui-sub" style="color:#4a5a6a">כוכב שלישי: ${fmt(r.coinTarget)} מטבעות בלי עומס יתר</div>` : '') +
-      (next ? `<div class="teaser"><div style="font-size:34px">${ICON[next.unlock.kind] ?? '🎁'}</div><div><b>בשלב הבא נפתח: ${esc(next.unlock.name)}</b><span>${esc(next.unlock.desc)}</span></div></div>` : '') +
+      (u ? `<div class="teaser"><div style="font-size:34px">${ICON[u.kind] ?? '🎁'}</div><div><b>בשלב הבא נפתח: ${esc(u.name)}</b><span>${esc(u.desc)}</span></div></div>` : '') +
       `<h4>שדרוגים</h4><div class="shop" data-shop></div><button class="btn go" data-next>ליום הבא</button>`);
     paintShop();
     cardWrap.querySelector('[data-shop]')!.addEventListener('click', (e) => {
