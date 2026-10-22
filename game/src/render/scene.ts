@@ -68,16 +68,19 @@ export function buildDumps(map: CityMap): Container {
   const c = new Container();
   const g = new Graphics(); c.addChild(g);
   const node = new Map(map.nodes.map((n) => [n.id, n]));
+  const painted = !!realTex((map.bg ?? 'bg') as RealKey); // small marker over painted art
   for (const d of map.dumps ?? []) {
     const n = node.get(d.nodeId); if (!n) continue;
-    const hw = 13;
-    g.poly(isoRect(Math.min(d.x, n.x) - hw, n.y - hw, Math.max(d.x, n.x) + hw, n.y + hw)).fill({ color: 0x55606c });
-    g.poly(isoRect(d.x - hw, Math.min(d.y, n.y) - hw, d.x + hw, Math.max(d.y, n.y) + hw)).fill({ color: 0x55606c });
-    g.poly(isoRect(d.x - 46, d.y - 46, d.x + 46, d.y + 46)).fill({ color: 0x4a5059 }).stroke({ width: 8, color: 0xffc83d });
+    const hw = 13, r = painted ? 26 : 46, k = r / 46;
+    if (!painted) { // over a painted bg the yard and its road link are in the art: no asphalt connector drawn twice
+      g.poly(isoRect(Math.min(d.x, n.x) - hw, n.y - hw, Math.max(d.x, n.x) + hw, n.y + hw)).fill({ color: 0x55606c });
+      g.poly(isoRect(d.x - hw, Math.min(d.y, n.y) - hw, d.x + hw, Math.max(d.y, n.y) + hw)).fill({ color: 0x55606c });
+    }
+    g.poly(isoRect(d.x - r, d.y - r, d.x + r, d.y + r)).fill({ color: 0x4a5059 }).stroke({ width: painted ? 6 : 8, color: 0xffc83d });
     const p = iso(d.x, d.y);
-    g.ellipse(p.x, p.y, 30, 15).fill({ color: 0x2b2f35 }).stroke({ width: 4, color: 0x8a939e });
+    g.ellipse(p.x, p.y, 30 * k, 15 * k).fill({ color: 0x2b2f35 }).stroke({ width: 4, color: 0x8a939e });
     const t = new Text({ text: 'תחנת ריקון', style: { fontFamily: 'Rubik, system-ui, sans-serif', fontWeight: '800', fontSize: 26, fill: 0xffffff, stroke: { color: INK, width: 6, join: 'round' } } });
-    t.anchor.set(0.5, 1); t.position.set(p.x, p.y - 34); c.addChild(t);
+    t.anchor.set(0.5, 1); t.position.set(p.x, p.y - (painted ? 22 : 34)); c.addChild(t);
   }
   return c;
 }
