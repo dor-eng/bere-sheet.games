@@ -207,7 +207,7 @@ export function createUi(): UiApi & UiExtra {
       `<h2>יום ${level.id}: ${esc(level.title)}</h2>` +
       `<div class="ui-sub" style="color:#4a5a6a;display:flex;justify-content:center;gap:6px;align-items:center">בקופה: <b>${fmt(save.coins)}</b>${COIN}</div>` +
       `<h4>האתרים היום</h4><div class="sites">${sites}</div>` +
-      `<h4>המטרה</h4><ul class="rules"><li>${STAR.replace('<svg', '<svg width="26" height="26"')} כוכב: מסיימים את היום</li>` +
+      `<h4>המטרה</h4><ul class="rules"><li>${STAR.replace('<svg', '<svg width="26" height="26"')} כוכב: מסיימים את היום ברווח</li>` +
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שני כוכבים: בלי אף עומס יתר</li>` +
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שלושה: גם ${fmt(level.coinTarget)} ${COIN}</li></ul>` +
       `<button class="btn go" data-go>יוצאים לעבודה</button>`);

@@ -1,4 +1,4 @@
-// Camera: pinch zoom + drag pan + wheel, clamped to the map; animated focus. z = zoom factor relative to fit-to-width (>= 1).
+// Camera: pinch zoom + drag pan + wheel, clamped to the map; animated focus. z = zoom factor relative to fit (cover) (>= 1).
 import type { Container } from 'pixi.js';
 
 export class Camera {
@@ -8,7 +8,8 @@ export class Camera {
   constructor(private world: Container, private mapW: number, private mapH: number) {
     this.cx = mapW / 2; this.cy = mapH / 2;
   }
-  get fit() { return this.vw / this.mapW; }
+  padTop = 170; // css px under the DOM HUD: the map can scroll so its top row clears the HUD
+  get fit() { return Math.max(this.vw / this.mapW, (this.vh - this.padTop) / this.mapH); } // cover the screen, no empty band
   get scale() { return this.fit * this.z; }
   private get zMax() { return Math.max(1.5, 1.5 / this.fit); } // up to ~1.5 css px per world px
   resize(w: number, h: number) { this.vw = w; this.vh = h; this.apply(); }
@@ -17,7 +18,8 @@ export class Camera {
     this.z = Math.min(this.zMax, Math.max(1, this.z));
     const hw = this.vw / this.scale / 2, hh = this.vh / this.scale / 2;
     this.cx = hw * 2 >= this.mapW ? this.mapW / 2 : Math.min(this.mapW - hw, Math.max(hw, this.cx));
-    this.cy = hh * 2 >= this.mapH ? this.mapH / 2 : Math.min(this.mapH - hh, Math.max(hh, this.cy));
+    const pt = this.padTop / this.scale, span = this.mapH + pt;
+    this.cy = hh * 2 >= span ? (this.mapH - pt) / 2 : Math.min(this.mapH - hh, Math.max(hh - pt, this.cy));
   }
   apply() {
     this.clamp();
