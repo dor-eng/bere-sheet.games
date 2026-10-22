@@ -880,7 +880,7 @@
   "city": "city-shows",
   "unlock": {
    "kind": "equipment",
-   "name": "פסטיבל שלושה ימים",
+   "name": "פסטיבל בשלושה גלים",
    "desc": "הבא: פסטיבל בפארק, שלושה גלי קהל",
    "icon": "icon-star"
   },
@@ -957,7 +957,7 @@
  },
  {
   "id": 12,
-  "title": "פסטיבל שלושה ימים",
+  "title": "פסטיבל בשלושה גלים",
   "dayLength": 280,
   "coinTarget": 900,
   "city": "city-shows",
