@@ -305,16 +305,20 @@ test('capital: a checkpoint edge is slower than main of the same length; mult=1 
     assert.equal(pathTime(line('check'), ['a', 'b'], 100), main);
   } finally { ECON.checkSpeedMult = keep; }
 });
-test('capital: depot->rally square detours via stone streets around the checkpoint (longer, faster)', () => {
+test('capital: the 4 checkpoints sit on painted barriers; every spot is reachable with or without them (check-free route is longer)', () => {
   const kinds = (p: string[]) => p.slice(1).map((n, i) => capital.edges.find((e) => (e.a === p[i] && e.b === n) || (e.b === p[i] && e.a === n))!.kind);
   const len = (p: string[]) => p.slice(1).reduce((t, n, i) => { const a = capital.nodes.find((x) => x.id === p[i])!, b = capital.nodes.find((x) => x.id === n)!; return t + Math.hypot(b.x - a.x, b.y - a.y); }, 0);
   assert.equal(capital.edges.filter((e) => e.kind === 'check').length, 4);
+  const noCheck: CityMap = { ...capital, edges: capital.edges.filter((e) => e.kind !== 'check') };
   const p = route(capital, capital.depotNodeId, 'Q2');
-  assert.ok(!kinds(p).includes('check'), p.join());
-  const viaCheck = [capital.depotNodeId, 'R6', 'S3', 'R5', 'Q2'];
-  assert.ok(kinds(viaCheck).includes('check'));
-  assert.ok(len(p) > len(viaCheck) && pathTime(capital, p, 100) < pathTime(capital, viaCheck, 100));
-  assert.ok(kinds(route(capital, 'R0', 'Q1')).includes('check')); // sometimes the checkpoint is still the fastest
+  assert.ok(kinds(p).includes('check'), p.join()); // the checkpoint is still the fastest way to the rally square from the depot
+  for (const sp of capital.spots) {
+    const free = route(noCheck, capital.depotNodeId, sp.nodeId);
+    assert.ok(free.length > 1, sp.id);
+    assert.ok(!kinds(free).includes('check'), sp.id);
+  }
+  const free = route(noCheck, capital.depotNodeId, 'Q2');
+  assert.ok(len(free) > len(p)); // the check-free detour is longer
 });
 test('capital: levels 7-9 use the capital map, every site spot reachable from the depot', () => {
   const lv = LEVELS.filter((l) => l.city === 'city-capital');
