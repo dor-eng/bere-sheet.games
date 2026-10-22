@@ -133,7 +133,7 @@ export function createUi(): UiApi & UiExtra {
       html = `<h3><span>🚚 ${esc(t.name)}</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
         `<div class="ui-sub">מצב: <b>${JOB[t.job][0]}</b> · מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></div>` +
         (t.carrying ? `<div class="ui-sub">מובילה ${t.carrying} תאים</div>` : '') +
-        `<div class="row"><button class="btn alt" data-act="recall"${t.job === 'idle' ? ' disabled' : ''}>חזרה למחסן</button></div>`;
+        `<div class="row"><button class="btn alt" data-act="recall"${t.job === 'idle' && t.path[t.path.length - 1] === s.map.depotNodeId ? ' disabled' : ''}>חזרה למחסן</button></div>`;
     } else {
       const free = s.cabins.filter(clean).length, wash = s.cabins.filter(dirty).length;
       html = `<h3><span>🏭 המחסן</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
