@@ -226,7 +226,8 @@ export function createUi(): UiApi & UiExtra {
     // trucks chips: what each one is doing, in words; the bar is the tank
     setHtml(chips, s.trucks.map((t) => { const p = pct(t.tank, t.tankCap); return `<button class="ui-chip" data-truck="${t.id}" style="font-family:inherit"><span class="top">🚚 <b>${esc(t.name)}</b><span class="st ${JOB[t.job][1]}">${esc(truckSay(t, s))}</span></span><span class="tank">מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></span></button>`; }).join(''));
     // alerts: sites overflowing / open with no cabins RIGHT NOW (from events, not history), or a cabin nearly full
-    const hot = s.sites.filter((st) => st.closed ? s.cabins.some((c) => c.siteId === st.def.id) : st.open && (book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id) || s.cabins.some((c) => c.siteId === st.def.id && c.fill / (c.capacity || 1) >= 0.85)));
+    const soon = (st: GameState['sites'][number]) => !st.open && !st.closed && st.def.openAt - s.time <= s.level.dayLength / 18 && !s.cabins.some((c) => c.siteId === st.def.id); // opens within a game hour with no cabins: warn before the fine starts
+    const hot = s.sites.filter((st) => st.closed ? s.cabins.some((c) => c.siteId === st.def.id) : soon(st) || st.open && (book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id) || s.cabins.some((c) => c.siteId === st.def.id && c.fill / (c.capacity || 1) >= 0.85)));
     paintAlerts(hot, s);
     guideTick(s);
     // slow lane (4Hz): history + open sheet
@@ -246,7 +247,7 @@ export function createUi(): UiApi & UiExtra {
   }
 
   function paintAlerts(hot: GameState['sites'], s: GameState) {
-    const why = (st: GameState['sites'][number]) => (st.closed ? 'תאים לאיסוף' : !s.cabins.some((c) => c.siteId === st.def.id) ? 'בלי תאים!' : book!.over.has(st.def.id) ? 'גולש!' : 'כמעט מלא');
+    const why = (st: GameState['sites'][number]) => (st.closed ? 'תאים לאיסוף' : !st.open ? `נפתח ב-${clock(st.def.openAt, s.level.dayLength)} בלי תאים` : !s.cabins.some((c) => c.siteId === st.def.id) ? 'בלי תאים!' : book!.over.has(st.def.id) ? 'גולש!' : 'כמעט מלא');
     const chip = (st: GameState['sites'][number]) => `<button class="ui-chip warn" data-site="${st.def.id}" style="font-family:inherit">⚠️ <b>${esc(shortName(st.def.name))}</b> ${why(st)}</button>`;
     const W = root.clientWidth, H = root.clientHeight, m = 36;
     const hudB = hud.getBoundingClientRect().bottom, sheetT = sel ? sheet.getBoundingClientRect().top : H;

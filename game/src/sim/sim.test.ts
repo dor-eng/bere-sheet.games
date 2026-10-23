@@ -752,3 +752,15 @@ test('collect: refused while the event runs and on an empty site; after close a 
   assert.ok(home.every((c) => c.washT > 0), 'collected cabins come home dirty');
   assert.equal(s.cabins.filter((c) => c.siteId === 's3').length, 1); // one left for a second trip
 });
+
+test('owner: construction sites close by 17:00, and no day opens more sites at once than the starting cabins', () => {
+  const base = UPGRADES.find((u) => u.id === 'cabin')!.values[0];
+  for (const lv of LEVELS) {
+    const t17 = Math.round((660 * lv.dayLength) / 1080);
+    for (const st of lv.sites) if (st.type === 'construction') assert.ok(st.closeAt <= t17, `L${lv.id} ${st.id} closes after 17:00`);
+    for (const st of lv.sites) {
+      const atOnce = lv.sites.filter((o) => o.openAt <= st.openAt && o.closeAt > st.openAt).length;
+      assert.ok(atOnce <= base, `L${lv.id}: ${atOnce} sites open at ${st.openAt}s, only ${base} cabins`);
+    }
+  }
+});
