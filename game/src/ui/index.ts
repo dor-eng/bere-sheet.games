@@ -21,11 +21,13 @@ const JOB: Record<TruckJob, [string, string]> = {
 /** What the truck is doing, in words (destination named). */
 function truckSay(t: Truck, s: GameState): string {
   const site = t.targetSiteId ? s.sites.find((x) => x.def.id === t.targetSiteId) : undefined, nm = site ? shortName(site.def.name) : '';
+  const home = t.path[t.path.length - 1] === s.map.depotNodeId; // route endpoint, not the job name
+  if (t.job !== 'idle' && t.job !== 'pumping' && t.job !== 'dumping' && !t.carrying && home && t.path.length > 1) return 'חוזרת למחסן';
   switch (t.job) {
     case 'toSite': return nm ? `בדרך ל${nm}` : 'בדרך לאתר';
     case 'delivering': return t.carrying ? `מביאה ${t.carrying} ${t.carrying === 1 ? 'תא' : 'תאים'}${nm ? ` ל${nm}` : ''}` : (nm ? `בדרך ל${nm}` : 'בדרך');
     case 'pumping': return nm ? `שואבת ב${nm}` : 'שואבת';
-    case 'toDepot': return 'חוזרת למחסן';
+    case 'toDepot': return home ? 'חוזרת למחסן' : 'נוסעת לרוקן את המיכל';
     case 'dumping': return 'מרוקנת את המיכל';
     default: return 'פנויה';
   }
@@ -212,7 +214,7 @@ export function createUi(): UiApi & UiExtra {
     progEl.style.width = pct(s.time, s.level.dayLength) + '%';
     // goal line: today's net, stars by the real rules (dayResult as if the day ended now), time left
     const net = Math.round(netOf(s)), res = dayResult({ ...s, over: true });
-    setHtml(goalEl, `יום ${s.level.id} · היום: <b class="${net < 0 ? 'neg' : ''}">${net < 0 ? '−' : '+'}${fmt(Math.abs(net))}</b> מתוך ${fmt(s.level.coinTarget)}`);
+    setHtml(goalEl, `יום ${s.level.id} · היום: <b class="${net < 0 ? 'neg' : ''}">${net < 0 ? '−' : '+'}${fmt(Math.abs(net))}</b> · לעבור: רווח · ל-3 כוכבים: ${fmt(s.level.coinTarget)}`);
     setHtml(starsEl, [0, 1, 2].map((i) => `<i class="${i < res.stars ? 'on' : ''}">${i < res.stars ? '★' : '☆'}</i>`).join(''));
     leftEl.textContent = `נשארו ${mmss(s.level.dayLength - s.time)}`;
     // trucks chips: what each one is doing, in words; the bar is the tank
