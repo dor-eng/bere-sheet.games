@@ -290,11 +290,13 @@ export function createUi(): UiApi & UiExtra {
       text: () => 'המשאית מביאה את התא. מחכים רגע' },
     { id: 'place2', pause: true, act: 'deliver', site: (s) => s.sites[1]?.def.id, trig: (s) => s.sites.length > 1 && s.time >= s.sites[1].def.openAt - 40,
       done: (s) => atSite(s, s.sites[1]?.def.id) > 1 || (g.delivered.get(s.sites[1]?.def.id) ?? 0) > 0 || s.sites[1]?.open || !s.cabins.some(clean),
-      text: (s) => sel?.kind === 'site' && sel.id === s.sites[1]?.def.id ? 'מעלים ל-2 עם הפלוס ולוחצים "הצב תאים"' : `${nm(s, s.sites[1]?.def.id)} נפתח עוד רגע. לחצו עליו והציבו 2 תאים לפני שהאורחים מגיעים` },
+      text: (s) => sel?.kind === 'site' && sel.id === s.sites[1]?.def.id ? 'לחצו "הצב תאים" כדי להביא 2 תאים' : `${nm(s, s.sites[1]?.def.id)} נפתח עוד רגע. לחצו עליו והציבו 2 תאים לפני שהאורחים מגיעים` },
     { id: 'pump', pause: true, act: 'service', site: (s) => hotCabin(s)?.siteId ?? undefined, trig: (s) => !!hotCabin(s) && s.time > 20, done: () => g.pumps > 0,
       text: (s) => sel?.kind === 'site' && sel.id === hotCabin(s)?.siteId ? 'לחצו "שלח משאבה"' : `תא ב${nm(s, hotCabin(s)?.siteId ?? undefined)} התמלא ברובו. לחצו על האתר ושלחו משאבה לפני שיגלוש` },
     { id: 'info', pause: true, ok: true, trig: () => g.pumps > 0, done: () => g.ack, text: () => 'האירוע משלם כשהוא נגמר. אפשר לזרז את השעון עם 2x ו-3x' },
-    { id: 'end', pause: false, trig: () => g.ack, done: () => g.endAt > 0 && performance.now() > g.endAt, text: () => 'זהו, מכאן לבד: מציבים תאים לפני האירוע, שואבים לפני שמתמלא' },
+    { id: 'pump2', pause: true, act: 'service', site: (s) => hotCabin(s)?.siteId ?? undefined, trig: (s) => g.ack && !!hotCabin(s) && truckReady(s), done: () => g.pumps > 1,
+      text: (s) => sel?.kind === 'site' && sel.id === hotCabin(s)?.siteId ? 'לחצו "שלח משאבה"' : `עוד תא ב${nm(s, hotCabin(s)?.siteId ?? undefined)} התמלא. שוב לוחצים על האתר ושולחים משאבה` },
+    { id: 'end', pause: false, trig: () => g.ack && g.pumps > 1, done: () => g.endAt > 0 && performance.now() > g.endAt, text: () => 'זהו, מכאן לבד: מציבים תאים לפני האירוע, שואבים לפני שמתמלא' },
   ];
   function guideStart(level: LevelDef, save: Save) {
     g.delivered.clear(); g.pumps = 0; g.ack = false; g.endAt = 0;
