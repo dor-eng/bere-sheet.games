@@ -75,7 +75,7 @@ export function createUi(): UiApi & UiExtra {
   let book: { s: GameState; over: Set<string>; noCab: Map<string, number>; t: number; minCoins: number } | null = null;
 
   const say = (msg: string) => { toast.textContent = msg; toast.classList.add('on'); clearTimeout(toastT); toastT = window.setTimeout(() => toast.classList.remove('on'), 2200); };
-  const run = (c: Parameters<UiHandlers['command']>[0], okMsg?: string) => { const r = h.command(c); if (r.ok) noteCmd(c); if (!r.ok) say(r.reason ?? 'לא הצלחנו, נסו שוב'); else if (okMsg) say(okMsg); else if (c.type === 'recall') say('המשאית חוזרת למחסן'); else say(c.type === 'service' ? 'המשאית יוצאת לשאוב!' : c.type === 'collect' ? 'המשאית יוצאת לאסוף את התאים' : 'התאים בדרך!'); return r; };
+  const run = (c: Parameters<UiHandlers['command']>[0], okMsg?: string) => { const r = h.command(c); if (r.ok) noteCmd(c); if (r.ok && c.type !== 'recall' && sel?.kind === 'site' && last) select(null, last); /* owner: the order is given, close the sheet */ if (!r.ok) say(r.reason ?? 'לא הצלחנו, נסו שוב'); else if (okMsg) say(okMsg); else if (c.type === 'recall') say('המשאית חוזרת למחסן'); else say(c.type === 'service' ? 'המשאית יוצאת לשאוב!' : c.type === 'collect' ? 'המשאית יוצאת לאסוף את התאים' : 'התאים בדרך!'); return r; };
   /** How many cabins a deliver command would really bring: min(truck carry, clean stock, free slots) - same as sim command(). */
   const deliverable = (s: GameState, siteId: string) => {
     const st = s.sites.find((x) => x.def.id === siteId), spot = st && s.map.spots.find((p) => p.id === st.def.spotId);
@@ -83,7 +83,7 @@ export function createUi(): UiApi & UiExtra {
     return Math.max(0, Math.min(ECON.cabinCarry, s.cabins.filter(clean).length, spot.slots.length - s.cabins.filter((c) => c.siteId === siteId).length));
   };
   const deliverCount = (s: GameState, siteId: string) => { const mx = deliverable(s, siteId); return mx < 1 ? 0 : deliverN ? Math.min(deliverN, mx) : Math.min(guideQty(siteId) || mx, mx); };
-  const idleTruck = (s: GameState): Truck | undefined => s.trucks.find((t) => t.job === 'idle') ?? s.trucks.find(takesOrder) ?? s.trucks[0];
+  const idleTruck = (s: GameState, pump = false): Truck | undefined => s.trucks.find((t) => t.job === 'idle') ?? s.trucks.find((t) => takesOrder(t) && (!pump || t.tank < t.tankCap - 0.001)) ?? s.trucks[0]; // a pump order needs tank room
 
   function mount(r: HTMLElement, handlers: UiHandlers) {
     root = r; h = handlers; root.textContent = '';
@@ -130,7 +130,7 @@ export function createUi(): UiApi & UiExtra {
     if (a === 'plus' && sel.kind === 'site') { deliverN = Math.min(deliverable(last, sel.id), deliverCount(last, sel.id) + 1); return refreshSheet(last); }
     // deliver loads only at the depot: prefer an idle truck parked there (another may be idle at a dump)
     const depot = last.map.depotNodeId;
-    const t = (a === 'deliver' && last.trucks.find((x) => x.job === 'idle' && x.path[x.path.length - 1] === depot)) || idleTruck(last);
+    const t = (a === 'deliver' && last.trucks.find((x) => x.job === 'idle' && x.path[x.path.length - 1] === depot)) || idleTruck(last, a === 'service');
     if (!t) return say('אין משאית פנויה');
     if (a === 'service' && sel.kind === 'site') run({ type: 'service', truckId: t.id, siteId: sel.id });
     else if (a === 'collect' && sel.kind === 'site') run({ type: 'collect', truckId: t.id, siteId: sel.id });

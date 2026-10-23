@@ -174,7 +174,7 @@
     "name": "אתר בנייה צפון",
     "spotId": "spot-build-a",
     "openAt": 35,
-    "closeAt": 147,
+    "closeAt": 146,
     "usage": [
      [
       0,
@@ -195,7 +195,7 @@
     "name": "אתר בנייה מרכז",
     "spotId": "spot-build-b",
     "openAt": 20,
-    "closeAt": 147,
+    "closeAt": 146,
     "usage": [
      [
       0,
@@ -260,7 +260,7 @@
     "name": "אתר בנייה - מגדל מול הים",
     "spotId": "spot-build-a",
     "openAt": 30,
-    "closeAt": 147,
+    "closeAt": 146,
     "usage": [
      [
       0,
@@ -398,7 +398,7 @@
     "name": "אתר בנייה - מגדל מול הים",
     "spotId": "spot-build-a",
     "openAt": 30,
-    "closeAt": 153,
+    "closeAt": 152,
     "usage": [
      [
       0,
@@ -492,7 +492,7 @@
     "name": "אתר בנייה - העיר העתיקה",
     "spotId": "spot-build-a",
     "openAt": 30,
-    "closeAt": 153,
+    "closeAt": 152,
     "usage": [
      [
       0,
@@ -557,7 +557,7 @@
     "name": "אתר בנייה - העיר העתיקה",
     "spotId": "spot-build-a",
     "openAt": 30,
-    "closeAt": 159,
+    "closeAt": 158,
     "usage": [
      [
       0,
@@ -734,7 +734,7 @@
     "name": "אתר בנייה - שכונת האצטדיון",
     "spotId": "spot-build-a",
     "openAt": 30,
-    "closeAt": 159,
+    "closeAt": 158,
     "usage": [
      [
       0,
