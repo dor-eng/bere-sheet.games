@@ -340,7 +340,7 @@ export function createRender(): RenderApi & RenderExtra {
       bindGestures(app.canvas, cam, (px, py) => { selected = hit(px, py); cb(selected); });
     },
     onSelect(f) { cb = f; },
-    focus(x, y) { if (!cam) return; const p = iso(x, y); cam.focus(p.x, p.y); },
+    focus(x, y, dy) { if (!cam) return; const p = iso(x, y); cam.focus(p.x, p.y, dy); },
     view(x, y) {
       if (!cam) return null;
       const p = iso(x, y), s = cam.scale;

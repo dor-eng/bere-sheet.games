@@ -4,7 +4,7 @@ import type { Container } from 'pixi.js';
 export class Camera {
   cx: number; cy: number; z = 1;
   vw = 390; vh = 844;
-  private anim: { cx: number; cy: number; z: number; t: number } | null = null;
+  private anim: { cx: number; cy: number; dy: number; z: number; t: number } | null = null;
   constructor(private world: Container, private mapW: number, private mapH: number) {
     this.cx = mapW / 2; this.cy = mapH / 2;
   }
@@ -37,12 +37,13 @@ export class Camera {
     this.cy = before.y - (py - this.vh / 2) / this.scale;
     this.apply();
   }
-  focus(x: number, y: number) { this.anim = { cx: x, cy: y, z: Math.max(this.z, 1.8), t: 0 }; }
+  /** dyPx > 0 puts the point that many screen px below the view centre (clear of an overlay on top) */
+  focus(x: number, y: number, dyPx = 0) { this.anim = { cx: x, cy: y, dy: dyPx, z: Math.max(this.z, 1.8), t: 0 }; }
   tick(dt: number) {
     const a = this.anim; if (!a) return;
     a.t += dt;
     const k = 1 - Math.exp(-dt * 9);
-    this.cx += (a.cx - this.cx) * k; this.cy += (a.cy - this.cy) * k; this.z += (a.z - this.z) * k;
+    this.cx += (a.cx - this.cx) * k; this.cy += (a.cy - a.dy / this.scale - this.cy) * k; this.z += (a.z - this.z) * k;
     this.apply();
     if (a.t > 0.9) this.anim = null;
   }

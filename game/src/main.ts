@@ -33,7 +33,7 @@ ui.mount(document.getElementById('ui')!, {
   startDay: () => { if (mapOf(level().city) !== map) { location.reload(); return; } state = createDay(level(), map, save); running = true; },
   buyUpgrade: (id) => { const r = buyUpgrade(save, id); if (r.ok) { save = r.save; persist(); } return r; },
   setSpeed: (x) => { speed = x; },
-  focus: (x, y) => render.focus(x, y),
+  focus: (x, y, dy) => render.focus(x, y, dy),
 });
 ui.setPause((p) => { paused = p; }); // the guided first day holds the clock while it waits for a tap
 ui.setView((x, y) => render.view(x, y)); // world -> screen, enables off-screen edge arrows

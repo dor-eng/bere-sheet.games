@@ -91,7 +91,7 @@ export interface RenderApi {
   mount(el: HTMLElement, map: CityMap): Promise<void>;
   update(s: GameState, frameDt: number): void; // called every frame after step(); also consumes s.events for FX
   onSelect(cb: (sel: Selection) => void): void;
-  focus(x: number, y: number): void;
+  focus(x: number, y: number, dyPx?: number): void;
 }
 //   export function createRender(): RenderApi
 
@@ -101,7 +101,7 @@ export interface UiHandlers {
   startDay(): void; // from the pre-day / end card
   buyUpgrade(id: UpgradeDef['id']): { ok: boolean; reason?: string };
   setSpeed(x: 1 | 2 | 3): void;
-  focus(x: number, y: number): void; // edge-arrow tap -> camera
+  focus(x: number, y: number, dyPx?: number): void; // edge-arrow tap -> camera
 }
 export interface UiApi {
   mount(root: HTMLElement, h: UiHandlers): void;

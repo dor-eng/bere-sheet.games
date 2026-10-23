@@ -104,6 +104,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0e2a47; tou
 .ui-guide { position: absolute; left: calc(var(--sal) + 10px); right: calc(var(--sar) + 10px); background: var(--yellow); border: 3px solid var(--ink); border-radius: 16px; padding: 8px 12px; font-weight: 800; font-size: 15px; text-align: center; box-shadow: 0 4px 0 #9d711d; pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 5; }
 .ui-guide .btn { flex: none; min-height: 40px; font-size: 16px; width: 100%; background: var(--paper); box-shadow: 0 4px 0 #052e4c; }
 .ui-guide a { font-size: 12px; font-weight: 600; text-decoration: underline; color: var(--ink); cursor: pointer; padding: 4px 10px; }
+.ui-guide small { font-size: 12px; font-weight: 700; opacity: .8; }
 .ui-finger { position: absolute; font-size: 44px; line-height: 1; transform: translate(-50%, 0); pointer-events: none; animation: fingerb .7s ease-in-out infinite alternate; z-index: 4; }
 @keyframes fingerb { to { transform: translate(-50%, 12px); } }
 .guide-pulse { animation: gpulse .8s ease-in-out infinite alternate; outline: 4px solid #fff; }

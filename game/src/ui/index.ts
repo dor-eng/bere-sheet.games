@@ -79,7 +79,7 @@ export function createUi(): UiApi & UiExtra {
     if (!st || !spot) return 0;
     return Math.max(0, Math.min(ECON.cabinCarry, s.cabins.filter(clean).length, spot.slots.length - s.cabins.filter((c) => c.siteId === siteId).length));
   };
-  const deliverCount = (s: GameState, siteId: string) => { const mx = deliverable(s, siteId); return mx < 1 ? 0 : deliverN ? Math.min(deliverN, mx) : mx; };
+  const deliverCount = (s: GameState, siteId: string) => { const mx = deliverable(s, siteId); return mx < 1 ? 0 : deliverN ? Math.min(deliverN, mx) : Math.min(guideQty(siteId) || mx, mx); };
   const idleTruck = (s: GameState): Truck | undefined => s.trucks.find((t) => t.job === 'idle') ?? s.trucks[0];
 
   function mount(r: HTMLElement, handlers: UiHandlers) {
@@ -272,7 +272,7 @@ export function createUi(): UiApi & UiExtra {
 
 
   // ---------- guided first day (level 1, fresh save): a step list + one bubble; the sim pauses while a step waits for the player ----------
-  type Step = { id: string; pause: boolean; ok?: boolean; site?: (s: GameState) => string | undefined; act?: 'deliver' | 'service'; trig: (s: GameState) => boolean; done: (s: GameState) => boolean; text: (s: GameState) => string };
+  type Step = { id: string; pause: boolean; ok?: boolean; qty?: number; site?: (s: GameState) => string | undefined; act?: 'deliver' | 'service'; trig: (s: GameState) => boolean; done: (s: GameState) => boolean; text: (s: GameState) => string };
   let bubble: HTMLElement, finger: HTMLElement, setPause: (p: boolean) => void = () => {};
   let guideSkipped = false;
   const g = { on: false, delivered: new Map<string, number>(), pumps: 0, ack: false, endAt: 0 };
@@ -285,12 +285,14 @@ export function createUi(): UiApi & UiExtra {
   const truckReady = (s: GameState) => s.trucks.some((t) => t.job === 'idle' && t.path[t.path.length - 1] === s.map.depotNodeId);
   const nm = (s: GameState, id?: string) => shortName(s.sites.find((x) => x.def.id === id)?.def.name ?? '');
   const STEPS: Step[] = [
-    { id: 'place1', pause: true, act: 'deliver', site: (s) => s.sites[0]?.def.id, trig: () => true,
+    { id: 'place1', pause: true, qty: 1, act: 'deliver', site: (s) => s.sites[0]?.def.id, trig: () => true,
       done: (s) => !!g.delivered.get(s.sites[0]?.def.id) || atSite(s, s.sites[0]?.def.id) > 0 || s.sites[0]?.closed || s.time > s.sites[0]?.def.openAt + 30 || !s.cabins.some(clean),
       text: (s) => sel?.kind === 'site' && sel.id === s.sites[0]?.def.id ? 'לחצו על "הצב תאים" כדי להביא תא אחד' : `לחצו על ${nm(s, s.sites[0]?.def.id)} במפה: שם מציבים את התא הראשון` },
     { id: 'watch', pause: false, trig: (s) => !!g.delivered.get(s.sites[0]?.def.id), done: (s) => atSite(s, s.sites[0]?.def.id) > 0 || s.time >= s.sites[1]?.def.openAt - 40,
       text: () => 'המשאית מביאה את התא. מחכים רגע' },
-    { id: 'place2', pause: true, act: 'deliver', site: (s) => s.sites[1]?.def.id, trig: (s) => s.sites.length > 1 && s.time >= s.sites[1].def.openAt - 40,
+    { id: 'fill', pause: false, trig: (s) => atSite(s, s.sites[0]?.def.id) > 0, done: (s) => s.time >= s.sites[1]?.def.openAt - 40 || !!hotCabin(s),
+      text: () => 'התא מוצב. עובדים משתמשים בו והוא מתמלא, והאתר משלם בסוף. אפשר ללחוץ 2x כדי לזרז' },
+    { id: 'place2', pause: true, qty: 2, act: 'deliver', site: (s) => s.sites[1]?.def.id, trig: (s) => s.sites.length > 1 && s.time >= s.sites[1].def.openAt - 40,
       done: (s) => atSite(s, s.sites[1]?.def.id) > 1 || (g.delivered.get(s.sites[1]?.def.id) ?? 0) > 0 || s.sites[1]?.open || !s.cabins.some(clean),
       text: (s) => sel?.kind === 'site' && sel.id === s.sites[1]?.def.id ? 'לחצו "הצב תאים" כדי להביא 2 תאים' : `${nm(s, s.sites[1]?.def.id)} נפתח עוד רגע. לחצו עליו והציבו 2 תאים לפני שהאורחים מגיעים` },
     { id: 'pump', pause: true, act: 'service', site: (s) => hotCabin(s)?.siteId ?? undefined, trig: (s) => !!hotCabin(s) && s.time > 20, done: () => g.pumps > 0,
@@ -302,7 +304,7 @@ export function createUi(): UiApi & UiExtra {
   ];
   function guideStart(level: LevelDef, save: Save) {
     g.delivered.clear(); g.pumps = 0; g.ack = false; g.endAt = 0;
-    g.on = level.id === 1 && !Object.keys(save.stars).length && !guideSkipped;
+    g.on = level.id === 1 && !Object.values(save.stars).some((n) => n > 0) && !guideSkipped;
   }
   function guideStop(skip: boolean) { if (skip) guideSkipped = true; g.on = false; setPause(false); bubble.classList.add('ui-hidden'); finger.classList.add('ui-hidden'); sheet.querySelectorAll('.guide-pulse').forEach((b) => b.classList.remove('guide-pulse')); }
   function guideTick(s: GameState) {
@@ -315,12 +317,17 @@ export function createUi(): UiApi & UiExtra {
     const wait = step.act === 'deliver' && !truckReady(s) || step.act === 'service' && !s.trucks.some((t) => t.job === 'idle');
     setPause(step.pause && !wait);
     const target = step.site?.(s), pt = target ? s.sites.find((x) => x.def.id === target) : undefined;
-    if (pt && step.pause && stepFocused !== step.id) { stepFocused = step.id; h.focus(pt.x, pt.y); }
     const txt = wait ? 'מחכים שהמשאית תתפנה' : step.text(s);
-    setHtml(bubble, `<span>${esc(txt)}</span>${step.ok ? '<button class="btn go" data-g="ok">הבנתי</button>' : ''}<a data-g="skip">דלג על ההדרכה</a>`);
+    setHtml(bubble, `${step.pause && !wait ? '<small>השעון עצור עד שתלחצו</small>' : ''}<span>${esc(txt)}</span>${step.ok ? '<button class="btn go" data-g="ok">הבנתי</button>' : ''}<a data-g="skip">דלג על ההדרכה</a>`);
     bubble.classList.remove('ui-hidden');
     const top = Math.max(chips.getBoundingClientRect().bottom, hud.getBoundingClientRect().bottom) + 8 - root.getBoundingClientRect().top;
     bubble.style.top = Math.round(top) + 'px';
+    // site plate (~160px above the pad incl. its name row) must land below the bubble, not under it
+    if (pt && step.pause && stepFocused !== step.id) {
+      stepFocused = step.id;
+      if (sel && !(sel.kind === 'site' && sel.id === target)) select(null, s); // another site's sheet would hide the map
+      h.focus(pt.x, pt.y, Math.max(0, top + bubble.offsetHeight + 170 - root.clientHeight / 2));
+    }
     // finger over the site on the map; pulse the button in the sheet
     const onSheetOf = sel?.kind === 'site' && sel.id === target;
     const p = pt && view && !wait && !onSheetOf ? view(pt.x, pt.y) : null;
@@ -328,6 +335,8 @@ export function createUi(): UiApi & UiExtra {
     sheet.querySelectorAll('[data-act]').forEach((b) => b.classList.toggle('guide-pulse', onSheetOf && !wait && (b as HTMLElement).dataset.act === step.act));
   }
   let stepFocused = '';
+  /** the cabin count the current guide step asks for on this site (0 = no guide default) */
+  function guideQty(siteId: string) { if (!g.on || !last) return 0; const st = STEPS.find((x) => !x.done(last!) && x.trig(last!)); return st?.qty && st.site?.(last!) === siteId ? st.qty : 0; }
 
   // ---------- cards ----------
   const showCard = (inner: string) => { cardWrap.innerHTML = `<div class="ui-card">${inner}</div>`; cardWrap.classList.remove('ui-hidden'); hud.classList.add('ui-hidden'); chips.classList.add('ui-hidden'); sheet.classList.add('ui-hidden'); arrows.style.display = 'none'; alertChips.style.display = 'none'; sel = null; };
