@@ -556,7 +556,7 @@ test('valley: levels 16-18 use the valley map with small trucks only; L18 unlock
     assert.ok(l.maxTank && l.maxTank <= UPGRADES.find((u) => u.id === 'tank')!.values[0], 'L' + l.id);
     for (const st of l.sites) assert.ok(valley.spots.some((p) => p.id === st.spotId), st.spotId);
   }
-  assert.equal(LEVELS.find((l) => l.id === 18)!.unlock.name, 'מדבר');
+  assert.equal(LEVELS.find((l) => l.id === 18)!.unlock.name, 'המדבר');
 });
 test('small truck: level maxTank caps a bought big tank; no maxTank = bought tank (neg control)', () => {
   const save: Save = { coins: 0, level: 16, stars: {}, upgrades: { pump: 0, tank: 3, cabin: 0 } };
