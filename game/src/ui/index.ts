@@ -291,7 +291,7 @@ export function createUi(): UiApi & UiExtra {
     { id: 'watch', pause: false, trig: (s) => !!g.delivered.get(s.sites[0]?.def.id), done: (s) => atSite(s, s.sites[0]?.def.id) > 0 || s.time >= s.sites[1]?.def.openAt - 40,
       text: () => 'המשאית מביאה את התא. מחכים רגע' },
     { id: 'fill', pause: false, trig: (s) => atSite(s, s.sites[0]?.def.id) > 0, done: (s) => s.time >= s.sites[1]?.def.openAt - 40 || !!hotCabin(s),
-      text: () => 'התא מוצב. עובדים משתמשים בו והוא מתמלא, והאתר משלם בסוף. אפשר ללחוץ 2x כדי לזרז' },
+      text: () => 'התא מוצב. כשהאתר נפתח, העובדים משתמשים בו והוא מתמלא. האתר משלם בסוף. אפשר ללחוץ 2x כדי לזרז' },
     { id: 'place2', pause: true, qty: 2, act: 'deliver', site: (s) => s.sites[1]?.def.id, trig: (s) => s.sites.length > 1 && s.time >= s.sites[1].def.openAt - 40,
       done: (s) => atSite(s, s.sites[1]?.def.id) > 1 || (g.delivered.get(s.sites[1]?.def.id) ?? 0) > 0 || s.sites[1]?.open || !s.cabins.some(clean),
       text: (s) => sel?.kind === 'site' && sel.id === s.sites[1]?.def.id ? 'לחצו "הצב תאים" כדי להביא 2 תאים' : `${nm(s, s.sites[1]?.def.id)} נפתח עוד רגע. לחצו עליו והציבו 2 תאים לפני שהאורחים מגיעים` },
