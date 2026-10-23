@@ -20,6 +20,7 @@ const runUntil = (s: GameState, pred: () => boolean, maxSec = 400) => {
   for (let i = 0; i < maxSec / DT && !s.over && !pred(); i++) step(s, DT);
 };
 const L1 = LEVELS[0];
+const L1LONG = { ...L1, sites: [{ ...L1.sites[0], closeAt: 195 }, ...L1.sites.slice(1)] }; // site open until 23:30 (pre owner hours change) for timing-pinned unit tests
 
 /** Greedy bot: pump anything nearly full, else deliver spare cabins (wedding gets 2), else pump what is >=60% full. */
 function botAct(s: GameState) {
@@ -94,7 +95,7 @@ test('overflow: open site with zero cabins fines; wedding fine and no fee when f
 });
 
 test('overflow: full cabin overflows and emits start/end events + fine event', () => {
-  const s = createDay(L1, map, newSave());
+  const s = createDay(L1LONG, map, newSave());
   const seen = new Set<string>();
   assert.ok(command(s, { type: 'deliver', truckId: 't1', siteId: 's1', count: 1 }).ok);
   for (let i = 0; i < 210 / DT && !s.over; i++) { step(s, DT); s.events.forEach((e) => seen.add(e.kind)); }
@@ -130,7 +131,7 @@ test('usage spreads least-full first across a site\'s cabins', () => {
 });
 
 test('service empties cabins, tips paid, tank dumped at depot, truck idle again', () => {
-  const s = createDay(L1, map, newSave());
+  const s = createDay(L1LONG, map, newSave());
   command(s, { type: 'deliver', truckId: 't1', siteId: 's1', count: 2 });
   runUntil(s, () => s.time > 100);
   const t = s.trucks[0];
