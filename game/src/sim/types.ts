@@ -28,18 +28,19 @@ export interface SiteDef {
 export interface UnlockDef { kind: 'site' | 'equipment' | 'vehicle' | 'city' | 'mechanic'; name: string; desc: string; icon: AssetKey }
 export interface LevelDef {
   id: number; title: string; dayLength: number; // sim seconds
-  city?: string; // CityMap id ('city-beach' | 'city-capital' | 'city-shows' | 'city-industry' | 'city-valley' | 'city-desert'), default 'city-real'
+  city?: string; // CityMap id ('city-beach' | 'city-capital' | 'city-shows' | 'city-industry' | 'city-valley' | 'city-desert' | 'city-night'), default 'city-real'
   maxTank?: number; // small trucks only (rough roads): tank capped at this many liters whatever tank upgrade was bought
+  night?: boolean; // night shift: truck drives at the 'lights' upgrade value x speed (dark streets are slow)
   washSec?: number; // water scarcity: seconds to wash one dirty cabin at the depot (default ECON.wash.sec)
   gateWindows?: [number, number][]; // sim-second [from, to) windows when 'gate' edges crawl (ECON.gateSpeedMult); none = gates are plain roads
   sites: SiteDef[];
   coinTarget: number; // 3rd star
   unlock: UnlockDef; // shown on this level's end card
 }
-export interface UpgradeDef { id: 'pump' | 'tank' | 'cabin'; name: string; desc: string; costs: number[]; values: number[] } // values[i] = stat at upgrade level i (values[0] = start)
+export interface UpgradeDef { id: 'pump' | 'tank' | 'cabin' | 'lights'; name: string; desc: string; costs: number[]; values: number[]; fromLevel?: number } // values[i] = stat at upgrade level i (values[0] = start)
 
 // ---------- persistent save (localStorage 'bereshit.save.v1') ----------
-export interface Save { coins: number; level: number; stars: Record<number, number>; upgrades: { pump: number; tank: number; cabin: number } }
+export interface Save { coins: number; level: number; stars: Record<number, number>; upgrades: { pump: number; tank: number; cabin: number; lights: number } }
 
 // ---------- live state (sim owns + mutates; render/ui read only) ----------
 export type TruckJob = 'idle' | 'toSite' | 'pumping' | 'toDepot' | 'dumping' | 'delivering';

@@ -1968,8 +1968,8 @@
   "washSec": 70,
   "unlock": {
    "kind": "city",
-   "name": "בקרוב",
-   "desc": "בקרוב: עוד עיר ועוד אירועים",
+   "name": "עיר הלילה",
+   "desc": "הבא: עיר הלילה. משמרת לילה, בחושך המשאית איטית - קנו פנסים",
    "icon": "icon-star"
   },
   "sites": [
@@ -2036,6 +2036,307 @@
     "type": "wedding",
     "name": "נאות המדבר - חתונה",
     "spotId": "spot-oasis",
+    "openAt": 60,
+    "closeAt": 200,
+    "usage": [
+     [
+      0,
+      0.3
+     ],
+     [
+      15,
+      2.0
+     ],
+     [
+      45,
+      2.6
+     ],
+     [
+      90,
+      1.4
+     ]
+    ],
+    "fee": 240,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3
+   }
+  ]
+ },
+ {
+  "id": 22,
+  "title": "משמרת לילה",
+  "dayLength": 270,
+  "coinTarget": 760,
+  "city": "city-night",
+  "night": true,
+  "unlock": {
+   "kind": "mechanic",
+   "name": "ליל השנה החדשה",
+   "desc": "הבא: חגיגת שנה חדשה, כולם בכיכר בחצות",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s1",
+    "type": "show",
+    "name": "המועדון - מסיבה עד הבוקר",
+    "spotId": "spot-club",
+    "openAt": 20,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      60,
+      1.2
+     ],
+     [
+      150,
+      1.5
+     ],
+     [
+      230,
+      1.0
+     ]
+    ],
+    "fee": 260,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s2",
+    "type": "construction",
+    "name": "שוק הלילה - דוכנים",
+    "spotId": "spot-market",
+    "openAt": 40,
+    "closeAt": 220,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      1.3
+     ],
+     [
+      140,
+      1.0
+     ]
+    ],
+    "fee": 180,
+    "serviceTip": 12,
+    "overflowFinePerSec": 2.5
+   },
+   {
+    "id": "s3",
+    "type": "wedding",
+    "name": "רחוב הברים - מסיבת רווקים",
+    "spotId": "spot-bars",
+    "openAt": 140,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.3
+     ],
+     [
+      15,
+      1.4
+     ],
+     [
+      45,
+      1.9
+     ],
+     [
+      90,
+      1.4
+     ]
+    ],
+    "fee": 240,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3
+   }
+  ]
+ },
+ {
+  "id": 23,
+  "title": "שנה חדשה",
+  "dayLength": 280,
+  "coinTarget": 820,
+  "city": "city-night",
+  "night": true,
+  "unlock": {
+   "kind": "site",
+   "name": "מסיבת פורים",
+   "desc": "הבא: מסיבת רחוב של פורים, תחפושות והמון אנשים",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s4",
+    "type": "show",
+    "name": "הכיכר - ספירה לאחור בחצות",
+    "spotId": "spot-square",
+    "openAt": 80,
+    "closeAt": 275,
+    "usage": [
+     [
+      0,
+      0.5
+     ],
+     [
+      60,
+      1.2
+     ],
+     [
+      140,
+      3.0
+     ],
+     [
+      170,
+      1.4
+     ],
+     [
+      230,
+      0.6
+     ]
+    ],
+    "fee": 340,
+    "serviceTip": 16,
+    "overflowFinePerSec": 3.5
+   },
+   {
+    "id": "s5",
+    "type": "show",
+    "name": "המועדון - מסיבת שנה חדשה",
+    "spotId": "spot-club",
+    "openAt": 20,
+    "closeAt": 240,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      1.5
+     ],
+     [
+      150,
+      1.8
+     ]
+    ],
+    "fee": 240,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s6",
+    "type": "construction",
+    "name": "שוק הלילה - דוכנים",
+    "spotId": "spot-market",
+    "openAt": 60,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      1.2
+     ],
+     [
+      120,
+      1.0
+     ]
+    ],
+    "fee": 170,
+    "serviceTip": 12,
+    "overflowFinePerSec": 2.5
+   }
+  ]
+ },
+ {
+  "id": 24,
+  "title": "מסיבת פורים",
+  "dayLength": 280,
+  "coinTarget": 860,
+  "city": "city-night",
+  "night": true,
+  "unlock": {
+   "kind": "city",
+   "name": "בקרוב",
+   "desc": "בקרוב: עוד עיר ועוד אירועים",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s7",
+    "type": "wedding",
+    "name": "מסיבת רחוב של פורים",
+    "spotId": "spot-purim",
+    "openAt": 30,
+    "closeAt": 275,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      40,
+      1.5
+     ],
+     [
+      120,
+      2.0
+     ],
+     [
+      200,
+      1.3
+     ]
+    ],
+    "fee": 300,
+    "serviceTip": 16,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s8",
+    "type": "show",
+    "name": "הכיכר - הופעת פורים",
+    "spotId": "spot-square",
+    "openAt": 120,
+    "closeAt": 260,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      20,
+      2.4
+     ],
+     [
+      60,
+      2.8
+     ],
+     [
+      100,
+      1.2
+     ]
+    ],
+    "fee": 260,
+    "serviceTip": 16,
+    "overflowFinePerSec": 3.5
+   },
+   {
+    "id": "s9",
+    "type": "wedding",
+    "name": "רחוב הברים - מסיבת תחפושות",
+    "spotId": "spot-bars",
     "openAt": 60,
     "closeAt": 200,
     "usage": [

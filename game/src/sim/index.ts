@@ -20,7 +20,7 @@ const EPS = 1e-6;
 const STOCK_SLOT = -1;
 
 export function newSave(): Save {
-  return { coins: 0, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0 } };
+  return { coins: 0, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0, lights: 0 } };
 }
 
 // ---------- routing ----------
@@ -131,10 +131,11 @@ export function createDay(level: LevelDef, map: CityMap, save: Save): GameState 
   const pump = UPGRADES.find((u) => u.id === 'pump')!.values[save.upgrades.pump];
   const tank = Math.min(UPGRADES.find((u) => u.id === 'tank')!.values[save.upgrades.tank], level.maxTank ?? Infinity);
   const cabinCount = UPGRADES.find((u) => u.id === 'cabin')!.values[save.upgrades.cabin];
+  const night = level.night ? UPGRADES.find((u) => u.id === 'lights')!.values[save.upgrades.lights ?? 0] : 1; // old saves have no lights
   const dn = nodeOf(map, map.depotNodeId);
   const truck: Truck = {
     id: 't1', name: level.maxTank ? 'המשאית הקטנה' : ECON.truck.name, job: 'idle', path: [map.depotNodeId], seg: 0, segT: 0,
-    x: dn.x, y: dn.y, angle: 0, tank: 0, tankCap: tank, pumpRate: pump, speed: ECON.truck.speed,
+    x: dn.x, y: dn.y, angle: 0, tank: 0, tankCap: tank, pumpRate: pump, speed: ECON.truck.speed * night,
     targetSiteId: null, carrying: 0,
   };
   const cabins: Cabin[] = [];

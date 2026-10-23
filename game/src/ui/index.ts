@@ -248,7 +248,7 @@ export function createUi(): UiApi & UiExtra {
 
   function paintShop() {
     const box = cardWrap.querySelector('[data-shop]') as HTMLElement | null; if (!box || !shopSave) return;
-    box.innerHTML = upgrades.map((u) => {
+    box.innerHTML = upgrades.filter((u) => shopSave!.level >= (u.fromLevel ?? 0)).map((u) => {
       const lvl = shopSave!.upgrades[u.id], cost = u.costs[lvl], maxed = cost === undefined;
       const poor = !maxed && shopSave!.coins < cost;
       return `<div class="up"><div class="nm">${esc(u.name)} · רמה ${lvl + 1}<small>${esc(u.desc)}</small></div>` +

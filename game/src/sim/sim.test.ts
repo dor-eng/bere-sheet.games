@@ -8,6 +8,7 @@ import cityShows from '../data/city-shows.json' with { type: 'json' };
 import cityIndustry from '../data/city-industry.json' with { type: 'json' };
 import cityValley from '../data/city-valley.json' with { type: 'json' };
 import cityDesert from '../data/city-desert.json' with { type: 'json' };
+import cityNight from '../data/city-night.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
 import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, gateCrowded, LEVELS, UPGRADES, ECON } from './index.ts';
 
@@ -224,7 +225,7 @@ test('economy: applyResult advances + keeps best stars, upgrades cost + cap', ()
   for (let i = 0; i < 3; i++) { const r = buyUpgrade(cur, 'pump'); assert.ok(r.ok); cur = r.save; }
   assert.equal(cur.upgrades.pump, 3); assert.equal(buyUpgrade(cur, 'pump').ok, false);
   for (const u of UPGRADES) { assert.equal(u.values.length, 4); assert.equal(u.costs.length, 3); }
-  assert.equal(LEVELS.length, 21);
+  assert.equal(LEVELS.length, 24);
   const s3 = createDay(LEVELS[0], map, cur);
   assert.equal(s3.trucks[0].pumpRate, 70);
 });
@@ -587,7 +588,7 @@ test('desert: levels 19-21 on the desert map, every site reachable, slower washi
     }
   }
   assert.ok(desert.edges.filter((e) => e.kind === 'sand').length > desert.edges.filter((e) => e.kind === 'main').length);
-  assert.equal(LEVELS.find((l) => l.id === 21)!.unlock.name, 'בקרוב');
+  assert.equal(LEVELS.find((l) => l.id === 21)!.unlock.name, 'עיר הלילה');
 });
 test('water scarcity: cabins back from a closed site wash for level washSec; no washSec = ECON.wash.sec (neg control)', () => {
   const save: Save = { coins: 0, level: 19, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 3 } };
@@ -616,4 +617,43 @@ test('desert play: bot reaches day end with >=1 star on L19-L21 with slow washin
     console.log('L' + l.id, JSON.stringify(r));
     assert.ok(r.stars >= 1, 'L' + l.id);
   }
+});
+const night = cityNight as unknown as CityMap;
+test('night: levels 22-24 on the night map, all night, every site reachable, alleys dominate; L24 unlock = soon', () => {
+  const lv = LEVELS.filter((l) => l.city === 'city-night');
+  assert.deepEqual(lv.map((l) => l.id), [22, 23, 24]);
+  for (const l of lv) {
+    assert.equal(l.night, true, 'L' + l.id);
+    for (const st of l.sites) {
+      const spot = night.spots.find((p) => p.id === st.spotId)!;
+      assert.ok(spot && route(night, night.depotNodeId, spot.nodeId).length > 1, st.spotId);
+    }
+  }
+  assert.ok(night.edges.filter((e) => e.kind === 'street').length > night.edges.filter((e) => e.kind === 'main').length);
+  assert.equal(LEVELS.find((l) => l.id === 24)!.unlock.name, 'בקרוב');
+});
+test('night shift: truck speed = lights value x base on night levels; day level unchanged; old save without lights = level 0 (neg controls)', () => {
+  const lights = UPGRADES.find((u) => u.id === 'lights')!;
+  const L22 = LEVELS.find((l) => l.id === 22)!;
+  const up = (n: number) => ({ coins: 0, level: 22, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0, lights: n } }) as Save;
+  assert.equal(createDay(L22, night, up(0)).trucks[0].speed, ECON.truck.speed * lights.values[0]);
+  assert.equal(createDay(L22, night, up(2)).trucks[0].speed, ECON.truck.speed * lights.values[2]);
+  assert.ok(lights.values[0] < 1 && lights.values[lights.values.length - 1] === 1);
+  assert.equal(createDay({ ...L22, night: undefined }, night, up(0)).trucks[0].speed, ECON.truck.speed);
+  const old = { coins: 0, level: 22, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0 } } as unknown as Save;
+  assert.equal(createDay(L22, night, old).trucks[0].speed, ECON.truck.speed * lights.values[0]);
+  assert.equal(lights.fromLevel, 22);
+});
+test('night play: bot reaches day end with >=1 star on L22-L24 without lights', () => {
+  const save: Save = { coins: 0, level: 22, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2, lights: 0 } };
+  const got: number[] = [];
+  for (const l of LEVELS.filter((x) => x.city === 'city-night')) {
+    const s = createDay(l, night, { ...save, level: l.id });
+    let n = 0;
+    while (!s.over) { if (n++ % 15 === 0) botAct(s); step(s, DT); }
+    const r = dayResult(s);
+    console.log('L' + l.id, JSON.stringify(r));
+    got.push(r.stars);
+  }
+  assert.ok(got.every((x) => x >= 1), got.join('/'));
 });
