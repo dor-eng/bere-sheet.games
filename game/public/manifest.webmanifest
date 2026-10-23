@@ -1,0 +1,17 @@
+{
+  "name": "בראשית — המשחק",
+  "short_name": "בראשית",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/play/",
+  "scope": "/play/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e2a47",
+  "theme_color": "#0A4E7F",
+  "icons": [
+    { "src": "/play/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/play/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/play/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

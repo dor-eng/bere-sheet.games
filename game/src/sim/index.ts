@@ -20,7 +20,35 @@ const EPS = 1e-6;
 const STOCK_SLOT = -1;
 
 export function newSave(): Save {
-  return { coins: 0, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0, lights: 0, engine: 0, fleet: 0 } };
+  return { coins: 0, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0, lights: 0, engine: 0, fleet: 0 }, best: {} };
+}
+
+/** Stored save text -> a valid Save. Broken JSON or a wrong shape never throws: unknown fields drop, missing ones take defaults; bad = the text was unusable or had to be repaired. */
+export function parseSave(raw: string | null): { save: Save; bad: boolean } {
+  const fresh = newSave();
+  if (raw === null) return { save: fresh, bad: false };
+  let o: any;
+  try { o = JSON.parse(raw); } catch { return { save: fresh, bad: true }; }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return { save: fresh, bad: true };
+  let bad = false;
+  const num = (v: unknown, d: number, min: number, max: number) => { if (typeof v === 'number' && Number.isFinite(v)) return Math.min(max, Math.max(min, Math.floor(v))); bad = true; return d; };
+  const rec = (v: unknown, max: number) => {
+    const out: Record<number, number> = {};
+    if (v === undefined) return out;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) { bad = true; return out; }
+    for (const [k, x] of Object.entries(v)) { const id = Number(k); if (Number.isInteger(id) && id >= 1 && id <= LEVELS.length && typeof x === 'number' && Number.isFinite(x)) out[id] = Math.min(max, Math.max(0, Math.floor(x))); else bad = true; }
+    return out;
+  };
+  const save: Save = {
+    coins: num(o.coins, 0, 0, 1e9), level: num(o.level, 1, 1, LEVELS.length), stars: rec(o.stars, 3),
+    upgrades: { ...fresh.upgrades }, best: rec(o.best, 1e9),
+  };
+  const up = o.upgrades && typeof o.upgrades === 'object' ? o.upgrades : (bad = true, {});
+  for (const k of Object.keys(save.upgrades) as (keyof Save['upgrades'])[]) {
+    const max = UPGRADES.find((u) => u.id === k)?.costs.length ?? 0;
+    save.upgrades[k] = up[k] === undefined ? 0 : num(up[k], 0, 0, max); // saves from before an upgrade existed lack its key: not damage
+  }
+  return { save, bad };
 }
 
 // ---------- routing ----------
@@ -439,6 +467,7 @@ export function applyResult(save: Save, r: DayResult): Save {
     level: Math.max(save.level, advance),
     stars: { ...save.stars, [r.levelId]: Math.max(prev, r.stars) },
     upgrades: { ...save.upgrades },
+    best: { ...save.best, ...(r.stars >= 1 ? { [r.levelId]: Math.max(save.best?.[r.levelId] ?? 0, r.earned - r.fines) } : {}) },
   };
 }
 

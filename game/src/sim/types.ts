@@ -40,7 +40,7 @@ export interface LevelDef {
 export interface UpgradeDef { id: 'pump' | 'tank' | 'cabin' | 'lights' | 'engine' | 'fleet'; name: string; desc: string; costs: number[]; values: number[]; fromLevel?: number } // values[i] = stat at upgrade level i (values[0] = start)
 
 // ---------- persistent save (localStorage 'bereshit.save.v1') ----------
-export interface Save { coins: number; level: number; stars: Record<number, number>; upgrades: { pump: number; tank: number; cabin: number; lights: number; engine: number; fleet: number } }
+export interface Save { coins: number; level: number; stars: Record<number, number>; upgrades: { pump: number; tank: number; cabin: number; lights: number; engine: number; fleet: number }; best?: Record<number, number> } // best = best day profit per level (personal area)
 
 // ---------- live state (sim owns + mutates; render/ui read only) ----------
 export type TruckJob = 'idle' | 'toSite' | 'pumping' | 'toDepot' | 'dumping' | 'delivering' | 'collecting'; // collecting = driving to a finished site to load its cabins
@@ -100,7 +100,8 @@ export interface RenderApi {
 // ---------- ui (ui lane implements src/ui/index.ts) ----------
 export interface UiHandlers {
   command(c: Command): CommandResult;
-  startDay(): void; // from the pre-day / end card
+  startDay(levelId: number): void; // from the pre-day card: plays this level (the saved one or a replay from the map)
+  toMenu(): void; // leave the day (not saved) for the title screen
   restart(): void; // wipe progress, back to day 1
   buyUpgrade(id: UpgradeDef['id']): { ok: boolean; reason?: string };
   setSpeed(x: 1 | 2 | 3): void;
@@ -111,7 +112,9 @@ export interface UiApi {
   update(s: GameState): void; // every frame; keep DOM writes cheap (diff)
   select(sel: Selection, s: GameState): void;
   showDayStart(level: LevelDef, save: Save): void;
-  showDayEnd(r: DayResult, save: Save, next: LevelDef | undefined): void; // includes shop + next-unlock teaser
+  showDayEnd(r: DayResult, save: Save, next: LevelDef | undefined): void; // includes shop + next-unlock teaser; next undefined = the last day was won -> ending
+  showTitle(save: Save, note?: string): void; // title screen + main menu
+  begin(level: LevelDef, save: Save): void; // start a day with no card (after a city-change reload)
 }
 //   export function createUi(): UiApi
 

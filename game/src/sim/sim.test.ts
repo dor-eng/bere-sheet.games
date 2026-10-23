@@ -10,7 +10,7 @@ import cityValley from '../data/city-valley.json' with { type: 'json' };
 import cityDesert from '../data/city-desert.json' with { type: 'json' };
 import cityNight from '../data/city-night.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
-import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, gateCrowded, LEVELS, UPGRADES, ECON } from './index.ts';
+import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, parseSave, route, pathTime, gateCrowded, LEVELS, UPGRADES, ECON } from './index.ts';
 import { staleSiteIds, needsActionId } from '../render/siteSync.ts';
 
 const map = city1 as unknown as CityMap;
@@ -763,4 +763,38 @@ test('owner: construction sites close by 17:00, and no day opens more sites at o
       assert.ok(atOnce <= base, `L${lv.id}: ${atOnce} sites open at ${st.openAt}s, only ${base} cabins`);
     }
   }
+});
+
+test('parseSave: broken or partial saves never throw and come back valid (PT-1023 B-1)', () => {
+  for (const raw of ['{bad json', '"x"', '[]', 'null', '42', '{"coins":5}', '{"coins":"a","level":99,"stars":[1],"upgrades":null}', '{"level":3,"stars":{"1":3,"2":9,"x":1},"upgrades":{"pump":2,"tank":-4}}']) {
+    const { save } = parseSave(raw);
+    assert.ok(save.level >= 1 && save.level <= LEVELS.length, raw);
+    assert.ok(Number.isFinite(save.coins) && save.coins >= 0, raw);
+    for (const k of Object.keys(newSave().upgrades)) assert.equal(typeof (save.upgrades as any)[k], 'number', raw + ' ' + k);
+    for (const v of Object.values(save.stars)) assert.ok(v >= 0 && v <= 3, raw);
+    if (!LEVELS[save.level - 1].city) createDay(LEVELS[save.level - 1], map, save); // a day can start from it (city1 levels; other cities need their map)
+  }
+  assert.equal(parseSave('{bad json').bad, true);
+  assert.equal(parseSave('{"coins":5}').save.coins, 5); // the usable part is kept
+  assert.equal(parseSave('{"level":3,"stars":{"2":9}}').save.stars[2], 3);
+  assert.equal(parseSave('{"level":99}').save.level, LEVELS.length);
+});
+
+test('parseSave: a good save (also an old one without newer keys) round-trips unchanged and not bad', () => {
+  const s = { coins: 1234, level: 7, stars: { 1: 3, 2: 2, 6: 1 }, upgrades: { pump: 1, tank: 2, cabin: 0, lights: 0, engine: 1, fleet: 0 }, best: { 1: 500 } };
+  const r = parseSave(JSON.stringify(s));
+  assert.equal(r.bad, false); assert.deepEqual(r.save, s);
+  const old = parseSave('{"coins":10,"level":2,"stars":{"1":1},"upgrades":{"pump":0,"tank":0,"cabin":0}}');
+  assert.equal(old.bad, false); assert.equal(old.save.upgrades.lights, 0); assert.deepEqual(old.save.best, {});
+  assert.deepEqual(parseSave(null), { save: newSave(), bad: false });
+});
+
+test('applyResult keeps the best day profit of a won level only', () => {
+  let s = newSave();
+  s = applyResult(s, { levelId: 1, earned: 300, fines: 50, stars: 1 } as any);
+  assert.equal(s.best![1], 250);
+  s = applyResult(s, { levelId: 1, earned: 200, fines: 0, stars: 2 } as any);
+  assert.equal(s.best![1], 250);
+  s = applyResult(s, { levelId: 2, earned: 100, fines: 400, stars: 0 } as any);
+  assert.equal(s.best![2], undefined);
 });

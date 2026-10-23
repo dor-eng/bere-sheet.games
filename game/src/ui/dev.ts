@@ -34,7 +34,7 @@ const state: GameState = {
 const ui = createUi();
 ui.mount(document.getElementById('ui')!, {
   command: (c) => (c.type === 'deliver' ? { ok: false, reason: 'אין תאים פנויים במחסן' } : { ok: true }),
-  startDay: () => {}, restart: () => {}, setSpeed: () => {}, focus: () => {},
+  startDay: () => {}, toMenu: () => {}, restart: () => {}, setSpeed: () => {}, focus: () => {},
   buyUpgrade: (id) => { const u = UP.find((x) => x.id === id)!; return save.coins >= u.costs[save.upgrades[id]] ? (save.coins -= u.costs[save.upgrades[id]++], { ok: true }) : { ok: false, reason: 'אין מספיק מטבעות' }; },
 });
 const result = { levelId: 1, stars: 2 as const, earned: 340, fines: 40, overflowSec: 0, coinTarget: 300 };

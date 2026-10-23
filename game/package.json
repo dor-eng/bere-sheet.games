@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test --experimental-strip-types src/sim/*.test.ts"
+    "test": "node --test --experimental-strip-types src/sim/*.test.ts src/ui/*.test.ts"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"

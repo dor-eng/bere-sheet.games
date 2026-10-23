@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 // DOM Hebrew RTL UI over the canvas. Reads GameState, calls handlers only (no sim logic, no canvas).
 import { LEVELS, ECON, dayResult, takesOrder } from '../sim/index.ts';
+import { prep } from './heb.ts';
+import { sfx, buzz, unlockAudio } from '../audio.ts';
+import { prefs, setPref } from '../prefs.ts';
 import type { GameState, UiApi, UiHandlers, Selection, LevelDef, Save, DayResult, UpgradeDef, Truck, TruckJob, Cabin } from '../sim/types.ts';
 
 const inDepot = (c: Cabin) => c.siteId === null && c.slot === -1;
@@ -26,10 +29,10 @@ function truckSay(t: Truck, s: GameState): string {
   if (t.job === 'delivering' && dirtyAboard) return `מחזירה ${t.carrying} ${t.carrying === 1 ? 'תא' : 'תאים'} לשטיפה`;
   if (t.job !== 'idle' && t.job !== 'pumping' && t.job !== 'dumping' && !t.carrying && home && t.path.length > 1) return 'חוזרת למחסן';
   switch (t.job) {
-    case 'toSite': return nm ? `בדרך ל${nm}` : 'בדרך לאתר';
-    case 'collecting': return nm ? `אוספת תאים מ${nm}` : 'אוספת תאים';
-    case 'delivering': return t.carrying ? `מביאה ${t.carrying} ${t.carrying === 1 ? 'תא' : 'תאים'}${nm ? ` ל${nm}` : ''}` : (nm ? `בדרך ל${nm}` : 'בדרך');
-    case 'pumping': return nm ? `שואבת ב${nm}` : 'שואבת';
+    case 'toSite': return nm ? `בדרך ${prep('ל', nm)}` : 'בדרך לאתר';
+    case 'collecting': return nm ? `אוספת תאים ${prep('מ', nm)}` : 'אוספת תאים';
+    case 'delivering': return t.carrying ? `מביאה ${t.carrying} ${t.carrying === 1 ? 'תא' : 'תאים'}${nm ? ` ${prep('ל', nm)}` : ''}` : (nm ? `בדרך ${prep('ל', nm)}` : 'בדרך');
+    case 'pumping': return nm ? `שואבת ${prep('ב', nm)}` : 'שואבת';
     case 'toDepot': return home ? 'חוזרת למחסן' : 'נוסעת לרוקן את המיכל';
     case 'dumping': return 'מרוקנת את המיכל';
     default: return 'פנויה';
@@ -66,7 +69,6 @@ export function createUi(): UiApi & UiExtra {
   let goalEl: HTMLElement, starsEl: HTMLElement, leftEl: HTMLElement, coinsEl: HTMLElement, clockEl: HTMLElement, progEl: HTMLElement, speedEl: HTMLElement;
   let sel: Selection = null;
   let last: GameState | null = null;
-  let howtoSeen = false; // ponytail: once per page load, not persisted
   let deliverN = 0 /* 0 = default: as many as can be delivered */, speed: 1 | 2 | 3 = 1, toastT = 0, lastCoins = -1;
   let view: ((x: number, y: number) => { x: number; y: number } | null) | null = null;
   const hist = new Map<string, { t: number; v: number }[]>();
@@ -117,6 +119,7 @@ export function createUi(): UiApi & UiExtra {
       if (b?.dataset.g === 'skip') guideStop(true); else if (b?.dataset.g === 'ok') { g.ack = true; }
     });
     root.append(hud, chips, arrows, alertChips, sheet, toast, finger, bubble, cardWrap);
+    root.addEventListener('pointerdown', (e) => { unlockAudio(); if ((e.target as HTMLElement).closest('button:not(:disabled),[data-g]')) sfx('tap'); }, true);
   }
 
   function paintSpeed() { speedEl.querySelectorAll('button').forEach((b) => b.classList.toggle('on', +(b as HTMLElement).dataset.sp! === speed)); }
@@ -136,7 +139,7 @@ export function createUi(): UiApi & UiExtra {
     else if (a === 'collect' && sel.kind === 'site') run({ type: 'collect', truckId: t.id, siteId: sel.id });
     else if (a === 'deliver' && sel.kind === 'site') {
       const n = deliverCount(last, sel.id), st = last.sites.find((x) => x.def.id === sel!.id);
-      run({ type: 'deliver', truckId: t.id, siteId: sel.id, count: n }, `${n} ${n === 1 ? 'תא' : 'תאים'} בדרך ל${shortName(st?.def.name ?? '')}`);
+      run({ type: 'deliver', truckId: t.id, siteId: sel.id, count: n }, `${n} ${n === 1 ? 'תא' : 'תאים'} בדרך ${prep('ל', shortName(st?.def.name ?? ''))}`);
     }
     else if (a === 'recall' && sel.kind === 'truck') run({ type: 'recall', truckId: sel.id });
     else if (a === 'service-depot') { /* depot has no extra action */ }
@@ -199,7 +202,7 @@ export function createUi(): UiApi & UiExtra {
     setHtml(sheet, html);
   }
 
-  let lastSlow = 0;
+  let lastSlow = 0, evSeen: GameState['events'] | null = null;
   /** Day bookkeeping from the event stream and the clock; restarts when a new GameState appears. */
   function track(s: GameState) {
     if (!book || book.s !== s) book = { s, over: new Set(), noCab: new Map(), t: s.time, minCoins: s.coins };
@@ -214,6 +217,11 @@ export function createUi(): UiApi & UiExtra {
 
   function update(s: GameState) {
     last = s; track(s);
+    if (s.events !== evSeen) for (const e of s.events) { // one pass per events array: a stopped clock keeps the old array
+      if (e.kind === 'delivered') sfx('deliver'); else if (e.kind === 'cabinEmptied') sfx('pump'); else if (e.kind === 'paid') sfx('coin');
+      else if (e.kind === 'overflowStart') { sfx('warn'); buzz([60, 40, 60]); }
+    }
+    evSeen = s.events;
     const coins = Math.floor(s.coinsStart + Math.max(0, netOf(s))); // what the bank will hold: fines never touch savings (applyResult)
     if (coins !== lastCoins) { lastCoins = coins; coinsEl.textContent = fmt(coins); }
     clockEl.textContent = clock(s.time, s.level.dayLength);
@@ -286,7 +294,7 @@ export function createUi(): UiApi & UiExtra {
   const setPause = (p: boolean) => { guidePause = p; rawPause(p || helpOpen); };
   function openHelp() {
     helpOpen = true; setPause(guidePause); bubble.classList.add('ui-hidden'); finger.classList.add('ui-hidden');
-    showHowTo(() => { hideCard(); helpOpen = false; setPause(guidePause); }, true);
+    showPause();
   }
   let guideSkipped = false;
   const g = { on: false, delivered: new Map<string, number>(), pumps: 0, ack: false, endAt: 0 };
@@ -310,10 +318,10 @@ export function createUi(): UiApi & UiExtra {
       done: (s) => atSite(s, s.sites[1]?.def.id) > 1 || (g.delivered.get(s.sites[1]?.def.id) ?? 0) > 0 || s.sites[1]?.open || !s.cabins.some(clean),
       text: (s) => sel?.kind === 'site' && sel.id === s.sites[1]?.def.id ? 'לחצו "הצב תאים" כדי להביא 2 תאים' : `${nm(s, s.sites[1]?.def.id)} נפתח עוד רגע. לחצו עליו והציבו 2 תאים לפני שהאורחים מגיעים` },
     { id: 'pump', pause: true, act: 'service', site: (s) => hotCabin(s)?.siteId ?? undefined, trig: (s) => !!hotCabin(s) && s.time > 20, done: () => g.pumps > 0,
-      text: (s) => sel?.kind === 'site' && sel.id === hotCabin(s)?.siteId ? 'לחצו "שלח משאבה"' : `תא ב${nm(s, hotCabin(s)?.siteId ?? undefined)} התמלא ברובו. לחצו על האתר ושלחו משאבה לפני שיגלוש` },
+      text: (s) => sel?.kind === 'site' && sel.id === hotCabin(s)?.siteId ? 'לחצו "שלח משאבה"' : `תא ${prep('ב', nm(s, hotCabin(s)?.siteId ?? undefined))} התמלא ברובו. לחצו על האתר ושלחו משאבה לפני שיגלוש` },
     { id: 'info', pause: true, ok: true, trig: () => g.pumps > 0, done: () => g.ack, text: () => 'האירוע משלם כשהוא נגמר. אפשר לזרז את השעון עם 2x ו-3x' },
     { id: 'pump2', pause: true, act: 'service', site: (s) => hotCabin(s)?.siteId ?? undefined, trig: (s) => g.ack && !!hotCabin(s) && truckReady(s), done: () => g.pumps > 1,
-      text: (s) => sel?.kind === 'site' && sel.id === hotCabin(s)?.siteId ? 'לחצו "שלח משאבה"' : `עוד תא ב${nm(s, hotCabin(s)?.siteId ?? undefined)} התמלא. שוב לוחצים על האתר ושולחים משאבה` },
+      text: (s) => sel?.kind === 'site' && sel.id === hotCabin(s)?.siteId ? 'לחצו "שלח משאבה"' : `עוד תא ${prep('ב', nm(s, hotCabin(s)?.siteId ?? undefined))} התמלא. שוב לוחצים על האתר ושולחים משאבה` },
     { id: 'end', pause: false, trig: () => g.ack && g.pumps > 1, done: () => g.endAt > 0 && performance.now() > g.endAt, text: () => 'זהו, מכאן לבד: מציבים תאים לפני האירוע, שואבים לפני שמתמלא' },
   ];
   function guideStart(level: LevelDef, save: Save) {
@@ -353,14 +361,92 @@ export function createUi(): UiApi & UiExtra {
   function guideQty(siteId: string) { if (!g.on || !last) return 0; const st = STEPS.find((x) => !x.done(last!) && x.trig(last!)); return st?.qty && st.site?.(last!) === siteId ? st.qty : 0; }
 
   // ---------- cards ----------
-  const showCard = (inner: string) => { cardWrap.innerHTML = `<div class="ui-card">${inner}</div>`; cardWrap.classList.remove('ui-hidden'); hud.classList.add('ui-hidden'); chips.classList.add('ui-hidden'); sheet.classList.add('ui-hidden'); arrows.style.display = 'none'; alertChips.style.display = 'none'; sel = null; };
+  const showCard = (inner: string, cls = '') => { cardWrap.innerHTML = `<div class="ui-card ${cls}">${inner}</div>`; cardWrap.classList.remove('ui-hidden'); cardWrap.scrollTop = 0; hud.classList.add('ui-hidden'); chips.classList.add('ui-hidden'); sheet.classList.add('ui-hidden'); arrows.style.display = 'none'; alertChips.style.display = 'none'; sel = null; };
   const hideCard = () => { cardWrap.classList.add('ui-hidden'); cardWrap.textContent = ''; hud.classList.remove('ui-hidden'); chips.classList.remove('ui-hidden'); arrows.style.display = ''; alertChips.style.display = ''; };
+  const on = (q: string, fn: () => void) => cardWrap.querySelector(q)?.addEventListener('click', fn);
+  const LOGO = `<div class="logo"><img src="/play/assets/logo-white.svg" alt="בראשית"></div>`;
+  const BACK = `<button class="ui-back" data-back aria-label="חזרה">→ חזרה</button>`;
+  const star = (cls = '', w = 26) => STAR.replace('<svg', `<svg width="${w}" height="${w}" class="${cls}"`);
+  const starsOf = (n: number, w = 16) => [0, 1, 2].map((i) => star(i < n ? 'on' : 'off', w)).join('');
+  const totalStars = (sv: Save) => Object.values(sv.stars).reduce((a, b) => a + b, 0);
+  /** City of a level: the 'city' unlock that led to it, else the first city. */
+  const cityName = (id: number) => { for (let i = id - 2; i >= 0; i--) if (LEVELS[i].unlock?.kind === 'city') return LEVELS[i].unlock!.name; return 'עיר הבנייה'; };
+  /** Two-tap confirm inside the card (no native confirm()): first tap arms, second within 4 s does it. */
+  const armed = (btn: HTMLButtonElement | null, ask: string, fn: () => void) => {
+    if (!btn) return; const orig = btn.innerHTML; let t = 0;
+    btn.addEventListener('click', () => {
+      if (btn.dataset.armed) { clearTimeout(t); fn(); return; }
+      btn.dataset.armed = '1'; btn.classList.add('danger'); btn.innerHTML = ask; buzz(30);
+      t = window.setTimeout(() => { delete btn.dataset.armed; btn.classList.remove('danger'); btn.innerHTML = orig; }, 4000);
+    });
+  };
+  let saveNow: Save | null = null; // latest save the shell screens read
+  let mapFrom: () => void = () => {};
 
-  /** How to play: shown before day 1 of a new game and from the day card button. */
+  /** Title screen + main menu. */
+  function showTitle(save: Save, note = '') {
+    saveNow = save; helpOpen = false;
+    const started = save.level > 1 || Object.keys(save.stars).length > 0, done = (save.stars[LEVELS.length] ?? 0) > 0;
+    showCard(`<div class="title-hero"><img class="t-logo" src="/play/assets/logo-white.svg" alt="בראשית"><div class="t-scene" aria-hidden="true"><img class="t-cab a" src="/play/assets/cabin.svg" alt=""><img class="t-cab b" src="/play/assets/cabin.svg" alt=""><img class="t-truck" src="/play/assets/truck.svg" alt=""></div><h1>משאיות השירותים של העיר</h1></div>` +
+      (note ? `<div class="note">${esc(note)}</div>` : '') +
+      `<button class="btn go big" data-play>${!started ? 'משחקים' : done ? 'משחקים שוב' : `ממשיכים מיום ${save.level}`}</button>` +
+      `<div class="menu"><button class="btn alt" data-map><span>🗺️</span>מפת השלבים</button><button class="btn alt" data-me><span>🏆</span>האזור שלי</button>` +
+      `<button class="btn alt" data-how><span>📖</span>איך משחקים</button><button class="btn alt" data-set><span>⚙️</span>הגדרות</button></div>` +
+      `<div class="t-foot">${star('on', 18)} ${totalStars(save)} / ${LEVELS.length * 3} · יום ${Math.min(save.level, LEVELS.length)} מתוך ${LEVELS.length}</div>`, 'title');
+    on('[data-play]', () => { sfx('go'); if (done) { mapFrom = () => showTitle(save); showMap(save); } else showDayStart(LEVELS[Math.min(save.level, LEVELS.length) - 1], save); });
+    on('[data-map]', () => { mapFrom = () => showTitle(save); showMap(save); });
+    on('[data-me]', () => showProfile(save, () => showTitle(save)));
+    on('[data-how]', () => showHowTo(() => showTitle(save)));
+    on('[data-set]', () => showSettings(() => showTitle(save)));
+  }
+
+  /** Levels map: every day by city, stars won, locked days greyed; an open day can be replayed. */
+  function showMap(save: Save) {
+    let html = '', city = '';
+    for (const l of LEVELS) {
+      const c = cityName(l.id);
+      if (c !== city) { html += `${city ? '</div>' : ''}<h4>${esc(c)}</h4><div class="lv-grid">`; city = c; }
+      const open = l.id <= save.level, st = save.stars[l.id] ?? 0, cur = l.id === save.level && st === 0;
+      html += `<button class="lv${open ? '' : ' lock'}${cur ? ' cur' : ''}" data-lv="${l.id}"${open ? '' : ' disabled'} aria-label="יום ${l.id}${open ? '' : ' נעול'}"><b>${open ? l.id : '🔒'}</b><span>${open ? starsOf(st, 14) : ''}</span></button>`;
+    }
+    showCard(`${BACK}<h2>מפת השלבים</h2><div class="ui-sub dark">${star('on', 18)} ${totalStars(save)} מתוך ${LEVELS.length * 3} כוכבים · לוחצים על יום פתוח כדי לשחק אותו</div>${html}</div>`, 'screen');
+    on('[data-back]', mapFrom);
+    cardWrap.querySelectorAll('[data-lv]').forEach((b) => b.addEventListener('click', () => { const l = LEVELS[+(b as HTMLElement).dataset.lv! - 1]; if (l.id <= save.level) showDayStart(l, save); }));
+  }
+
+  /** Personal area: progress, stars, best profit per day, the fleet. */
+  function showProfile(save: Save, back: () => void) {
+    const won = LEVELS.filter((l) => (save.stars[l.id] ?? 0) > 0).length, three = LEVELS.filter((l) => save.stars[l.id] === 3).length;
+    const best = save.best ?? {}, bestSum = Object.values(best).reduce((a, b) => a + b, 0);
+    const top = Object.entries(best).sort((a, b) => b[1] - a[1])[0];
+    const rows = LEVELS.filter((l) => l.id <= save.level).map((l) => `<div class="pr-row"><span class="d">יום ${l.id}</span><span class="nm">${esc(l.title)}</span><span class="s">${starsOf(save.stars[l.id] ?? 0, 13)}</span><span class="v">${best[l.id] !== undefined ? fmt(best[l.id]) : '—'}</span></div>`).join('');
+    const ups = upgrades.map((u) => `<div class="pr-up"><span>${esc(u.name)}</span><b>${save.upgrades[u.id] + 1} / ${u.costs.length + 1}</b></div>`).join('');
+    showCard(`${BACK}<h2>האזור שלי</h2>` +
+      `<div class="stats"><div><b>${won}</b><span>ימים הושלמו</span></div><div><b>${totalStars(save)}</b><span>כוכבים</span></div><div><b>${three}</b><span>ימים מושלמים</span></div>` +
+      `<div><b>${fmt(save.coins)}</b><span>בקופה</span></div><div><b>${fmt(bestSum)}</b><span>סך השיאים</span></div><div><b>${top ? fmt(top[1]) : '—'}</b><span>${top ? `השיא: יום ${top[0]}` : 'שיא יומי'}</span></div></div>` +
+      `<h4>הצי והמחסן</h4><div class="pr-ups">${ups}</div>` +
+      `<h4>השיאים שלי</h4><div class="pr-head"><span>יום</span><span></span><span>כוכבים</span><span>רווח שיא</span></div><div class="pr-list">${rows}</div>`, 'screen');
+    on('[data-back]', back);
+  }
+
+  /** Settings: sound, vibration, reset progress, about + privacy. */
+  function showSettings(back: () => void) {
+    const tg = (k: 'sound' | 'vibe', label: string, icon: string) => `<button class="tg${prefs[k] ? ' on' : ''}" data-tg="${k}" role="switch" aria-checked="${prefs[k]}"><span>${icon} ${label}</span><i></i></button>`;
+    showCard(`${BACK}<h2>הגדרות</h2><div class="tgs">${tg('sound', 'צלילים', '🔊')}${tg('vibe', 'רטט', '📳')}</div>` +
+      `<h4>התקדמות</h4><button class="btn alt" data-reset>מתחילים מחדש מיום 1</button><div class="ui-sub dark">מוחק כוכבים, מטבעות ושדרוגים במכשיר הזה.</div>` +
+      `<h4>על המשחק</h4><div class="about">משחק של <b>בראשית</b>: שירותים כימיים, משאיות ושטיפה. ההתקדמות נשמרת רק במכשיר הזה. המשחק לא אוסף פרטים אישיים ולא שולח מידע לשום מקום.<br>גופן: Rubik (רישיון OFL).</div>`, 'screen');
+    on('[data-back]', back);
+    cardWrap.querySelectorAll('[data-tg]').forEach((b) => b.addEventListener('click', () => {
+      const k = (b as HTMLElement).dataset.tg as 'sound' | 'vibe', v = !prefs[k]; setPref(k, v);
+      b.classList.toggle('on', v); b.setAttribute('aria-checked', String(v)); if (k === 'sound' && v) { unlockAudio(); sfx('coin'); } if (k === 'vibe' && v) buzz(40);
+    }));
+    armed(cardWrap.querySelector('[data-reset]'), 'בטוחים? לוחצים שוב כדי למחוק הכל', () => h.restart());
+  }
+
+  /** How to play: from the menu, before the first day of a new game, and from the pause card. */
   function showHowTo(then: () => void, paused = false) {
-    showCard(`<div class="logo"><img src="/play/assets/logo-white.svg" alt="בראשית"></div>` +
-      (paused ? `<h2>המשחק עצור</h2><div class="ui-sub" style="color:#4a5a6a">השעון לא זז עד שחוזרים לשחק. תזכורת לחוקים:</div>` : `<h2>איך משחקים</h2>`) +
-      `<div class="ui-sub" style="color:#4a5a6a">אתם מנהלים את משאיות השירותים של בראשית. אין יריב: משחקים נגד השעון.</div>` +
+    showCard(LOGO + `<h2>איך משחקים</h2>` +
+      `<div class="ui-sub dark">אתם מנהלים את משאיות השירותים של בראשית. אין יריב: משחקים נגד השעון.</div>` +
       `<ul class="rules">` +
       `<li>🎉 <span>בכל יום יש אירועים בעיר: חתונות, הופעות, אתרי בנייה. האורחים משתמשים בתאים והתאים מתמלאים.</span></li>` +
       `<li>🚽 <span>לוחצים על אתר ← <b>הצב תאים</b>: המשאית מביאה תאים מהמחסן.</span></li>` +
@@ -368,31 +454,49 @@ export function createUi(): UiApi & UiExtra {
       `<li>⚠️ <span>תא שמתמלא עד הסוף = עומס יתר = קנס. מקדימים את המשאבה.</span></li>` +
       `<li>⏰ <span>גם אתר פתוח <b>בלי תאים</b> מקבל קנס. מציבים תאים <b>לפני</b> שהאירוע נפתח.</span></li>` +
       `<li>🧽 <span>האירוע נגמר? לוחצים עליו ← <b>החזר תאים לשטיפה</b>: המשאית אוספת אותם למחסן, ורק תא שטוף יוצא שוב.</span></li>` +
-      `<li>${COIN} <span>התשלום מגיע כשהאירוע נגמר, ואובד אם היה עומס יתר ארוך. בכסף קונים שדרוגים.</span></li>` +
+      `<li>${COIN} <span>התשלום מגיע כשהאירוע נגמר, ואובד אם היה עומס יתר של יותר מ-${ECON.feeOverflowTolerance} שניות. בכסף קונים שדרוגים.</span></li>` +
       `</ul>` +
-      `<button class="btn go" data-ok>${paused ? 'חוזרים לשחק' : 'הבנתי, יאללה'}</button>`);
-    cardWrap.querySelector('[data-ok]')!.addEventListener('click', then);
+      `<button class="btn go" data-ok>${paused ? 'חזרה' : 'הבנתי, יאללה'}</button>`);
+    on('[data-ok]', () => { setPref('howto', true); then(); });
   }
 
+  /** Pause: the clock holds while this card is open. */
+  function showPause() {
+    const lv = last?.level;
+    showCard(LOGO + `<h2>המשחק עצור</h2><div class="ui-sub dark">השעון לא זז עד שחוזרים לשחק.</div>` +
+      `<button class="btn go" data-ok>חוזרים לשחק</button>` +
+      `<div class="menu"><button class="btn alt" data-how><span>📖</span>איך משחקים</button><button class="btn alt" data-set><span>⚙️</span>הגדרות</button></div>` +
+      `<button class="btn alt" data-again>מתחילים את היום מחדש</button><button class="btn alt" data-menu style="margin-top:8px">לתפריט הראשי</button>`);
+    on('[data-ok]', () => { hideCard(); helpOpen = false; setPause(guidePause); });
+    on('[data-how]', () => showHowTo(showPause, true));
+    on('[data-set]', () => showSettings(showPause));
+    armed(cardWrap.querySelector('[data-again]'), 'לוחצים שוב: היום יתחיל מההתחלה', () => { helpOpen = false; guideStop(false); if (lv) begin(lv, saveNow!); });
+    armed(cardWrap.querySelector('[data-menu]'), 'לוחצים שוב: היום הזה לא יישמר', () => { helpOpen = false; guideStop(false); h.toMenu(); });
+  }
+
+  /** Start a day right away (the card's go button, a restart, or the auto-start after a city change). */
+  function begin(level: LevelDef, save: Save) { hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(level.id); guideStart(level, save); }
+
   function showDayStart(level: LevelDef, save: Save) {
-    if (level.id === 1 && !Object.keys(save.stars).length && !howtoSeen) { howtoSeen = true; return showHowTo(() => showDayStart(level, save)); }
+    saveNow = save;
+    if (level.id === 1 && !Object.keys(save.stars).length && !prefs.howto) return showHowTo(() => showDayStart(level, save));
     const len = level.dayLength;
     const nu = LEVELS[level.id - 2]?.unlock; // the previous level's unlock describes what this day brings: introduce it on the day it first appears
     const nuText = (u: NonNullable<typeof nu>) => { const d = u.desc.replace(/^הבא:\s*/, ''); return d.startsWith(u.name + '. ') ? d.slice(u.name.length + 2) : d; }; // the city name is already the title
     const sites = level.sites.map((s) => `<div class="site-row"><span>${SITE_ICON[s.type]}</span><span>${esc(s.name)}</span><span class="t">${clock(s.openAt, len)}–${clock(s.closeAt, len)}</span></div>`).join('');
-    showCard(`<div class="logo"><img src="/play/assets/logo-white.svg" alt="בראשית"></div>` +
+    const best = save.stars[level.id] ?? 0, replay = level.id < save.level;
+    showCard(`<div class="card-top"><button class="ui-back" data-menu aria-label="לתפריט">☰ תפריט</button><span class="bank">${COIN}<b>${fmt(save.coins)}</b></span></div>` +
       `<h2>יום ${level.id}: ${esc(level.title)}</h2>` +
-      `<div class="ui-sub" style="color:#4a5a6a;display:flex;justify-content:center;gap:6px;align-items:center">בקופה: <b>${fmt(save.coins)}</b>${COIN}</div>` +
+      (replay ? `<div class="ui-sub dark">משחקים שוב · הכי טוב עד עכשיו: ${starsOf(best, 16)}</div>` : '') +
       (nu ? `<div class="teaser"><div style="font-size:34px">${ICON[nu.kind] ?? '🎁'}</div><div><b>חדש היום: ${esc(nu.name)}</b><span>${esc(nuText(nu))}</span></div></div>` : '') +
       `<h4>האתרים היום</h4><div class="sites">${sites}</div>` +
-      `<h4>המטרה</h4><ul class="rules"><li>${STAR.replace('<svg', '<svg width="26" height="26"')} כוכב: מסיימים את היום ברווח (שכר פחות קנסות גדול מאפס)</li>` +
-      `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שני כוכבים: גם עומס יתר של עד ${ECON.feeOverflowTolerance} שניות בסך הכל</li>` +
-      `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שלושה: גם רווח של ${fmt(level.coinTarget)} ${COIN} ביום (הרווח של היום, לא מה שבקופה)</li></ul>` +
-      `<button class="btn go" data-go>${level.id > 1 ? `ממשיכים מיום ${level.id}` : 'יוצאים לעבודה'}</button><button class="btn alt" data-how style="margin-top:8px">איך משחקים?</button>` +
-      (level.id > 1 ? `<button class="btn alt" data-restart style="margin-top:8px">מתחילים מחדש מיום 1</button>` : ''));
-    cardWrap.querySelector('[data-go]')!.addEventListener('click', () => { hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(); guideStart(level, save); });
-    cardWrap.querySelector('[data-how]')!.addEventListener('click', () => showHowTo(() => showDayStart(level, save)));
-    cardWrap.querySelector('[data-restart]')?.addEventListener('click', () => { if (confirm('להתחיל מחדש מיום 1? כל הכוכבים, המטבעות והשדרוגים יימחקו')) h.restart(); });
+      `<h4>המטרה</h4><ul class="rules"><li>${star()} <span>כוכב: מסיימים את היום ברווח (שכר פחות קנסות גדול מאפס)</span></li>` +
+      `<li>${star()}${star()} <span>שני כוכבים: גם עומס יתר של עד ${ECON.feeOverflowTolerance} שניות בסך הכל</span></li>` +
+      `<li>${star()}${star()}${star()} <span>שלושה: גם רווח של ${fmt(level.coinTarget)} ${COIN} ביום (הרווח של היום, לא מה שבקופה)</span></li></ul>` +
+      `<div class="foot"><button class="btn go" data-go>${level.id === 1 && !replay ? 'יוצאים לעבודה' : replay ? `משחקים את יום ${level.id}` : `ממשיכים מיום ${level.id}`}</button><button class="btn alt" data-how>איך משחקים?</button></div>`);
+    on('[data-go]', () => { sfx('go'); begin(level, save); });
+    on('[data-how]', () => showHowTo(() => showDayStart(level, save)));
+    on('[data-menu]', () => h.toMenu());
   }
 
   /** Main reason the day lost stars: the site with the biggest loss (fine + forfeited fee), with one tip. Null when nothing to say. */
@@ -405,30 +509,35 @@ export function createUi(): UiApi & UiExtra {
       if (loss > wl) { worst = st; wl = loss; wf = fine; wForfeit = forfeit; }
     }
     if (!worst) return r.earned - r.fines <= 0 ? { line: 'לא נכנס כסף: התשלום מגיע רק כשהאירוע נגמר.', tip: 'הציבו תאים באתרים ושלחו משאבה לפני שהם מתמלאים.' } : null;
-    const nm = worst.def.name, sec = Math.round(worst.overflowSec), nc = Math.round(book?.s === s ? book.noCab.get(worst.def.id) ?? 0 : 0);
+    const tol = ECON.feeOverflowTolerance, nm = worst.def.name, sec = wForfeit ? Math.max(tol + 1, Math.ceil(worst.overflowSec)) : Math.min(tol, Math.floor(worst.overflowSec)), // 'over 12 s' = forfeit: never show 12 next to a lost fee
+    nc = Math.round(book?.s === s ? book.noCab.get(worst.def.id) ?? 0 : 0);
     const noCabMain = nc >= worst.overflowSec * 0.5;
     const line = (noCabMain ? `האתר ${nm} היה פתוח בלי תאים ${nc} שניות` : `האתר ${nm} היה בעומס יתר ${sec} שניות`) + `: קנס ${fmt(wf)}` + (wForfeit ? ` והתשלום (${fmt(worst.def.fee)}) אבד` : '');
-    const tip = noCabMain ? `הציבו תאים לפני הפתיחה (${clock(worst.def.openAt, s.level.dayLength)}).` : 'שלחו משאבה כשהתאים מגיעים לכ-70%, לפני שהם מלאים.';
+    const tip = noCabMain ? `הציבו תאים לפני הפתיחה (${clock(worst.def.openAt, s.level.dayLength)}).` : 'שלחו משאבה כשהתא מלא בערך בשני שליש, לפני שהוא מתמלא.';
     return { line, tip };
   }
 
   function showDayEnd(r: DayResult, save: Save, next: LevelDef | undefined) {
-    shopSave = JSON.parse(JSON.stringify(save));
+    shopSave = JSON.parse(JSON.stringify(save)); saveNow = shopSave;
     // a level's unlock describes what the following level brings, so show the one just won
-    const u = r.stars >= 1 ? LEVELS.find((l) => l.id === r.levelId)?.unlock : undefined;
+    const u = r.stars >= 1 && next ? LEVELS.find((l) => l.id === r.levelId)?.unlock : undefined;
     const stars = [0, 1, 2].map((i) => STAR.replace('<svg', `<svg class="${i < r.stars ? 'on' : ''}" style="--d:${0.3 + i * 0.35}s"`)).join('');
-    const cause = lossCause(r), won = r.stars >= 1;
+    const cause = lossCause(r), won = r.stars >= 1, last24 = won && !next;
     const kept = !won && !!last && last.level.id === r.levelId && !!book && book.s === last && book.minCoins < last.coinsStart;
     const msg = r.stars === 3 ? 'מושלם! אלופי השירות!' : r.stars === 2 ? 'יופי של יום!' : r.stars === 1 ? 'סיימנו! אפשר יותר' : 'יום קשה, ננסה שוב';
+    const record = won && save.best?.[r.levelId] === r.earned - r.fines && r.earned - r.fines > 0;
     showCard(`<h2>${msg}</h2><div class="big-stars">${stars}</div>` +
-      `<div class="sum"><div class="pos">הרווחנו<b>+${fmt(r.earned)}</b></div><div class="neg">קנסות<b>−${fmt(r.fines)}</b></div><div>בקופה<b>${fmt(save.coins)}</b></div></div>` +
+      `<div class="sum"><div class="pos">הרווחנו<b>+${fmt(r.earned)}</b></div><div class="neg">קנסות<b>${r.fines ? `−${fmt(r.fines)}` : '0'}</b></div><div>בקופה<b>${fmt(save.coins)}</b></div></div>` +
+      (record ? `<div class="ui-sub dark">🏆 שיא חדש ליום ${r.levelId}</div>` : '') +
       (cause && r.stars < 2 ? `<div class="cause"><b>${esc(cause.line)}</b><span>טיפ: ${esc(cause.tip)}</span></div>` : '') +
-      (kept ? `<div class="ui-sub" style="color:#4a5a6a">הקנסות לא נגעו בחיסכון: ${fmt(save.coins)} נשארו בקופה.</div>` : '') +
-      (r.stars < 3 ? `<div class="ui-sub" style="color:#4a5a6a">כוכב שלישי: רווח של ${fmt(r.coinTarget)} ביום, עם עד ${ECON.feeOverflowTolerance} שניות עומס יתר</div>` : '') +
+      (kept ? `<div class="ui-sub dark">הקנסות לא נגעו בחיסכון: ${fmt(save.coins)} נשארו בקופה.</div>` : '') +
+      (r.stars < 3 ? `<div class="ui-sub dark">כוכב שלישי: רווח של ${fmt(r.coinTarget)} ביום, עם עד ${ECON.feeOverflowTolerance} שניות עומס יתר</div>` : '') +
       (u ? `<div class="teaser"><div style="font-size:34px">${ICON[u.kind] ?? '🎁'}</div><div><b>בשלב הבא נפתח: ${esc(u.name)}</b><span>${esc(u.desc)}</span></div></div>` : '') +
-      `<h4>שדרוגים</h4><div class="shop" data-shop></div><button class="btn go" data-next>${won ? 'ליום הבא' : `נסה שוב את יום ${r.levelId}`}</button>`);
+      (last24 ? '' : `<h4>שדרוגים</h4><div class="shop" data-shop></div>`) +
+      `<div class="foot"><button class="btn go" data-next>${last24 ? 'לסיום המשחק 🎉' : won ? 'ליום הבא' : `נסה שוב את יום ${r.levelId}`}</button><button class="btn alt" data-menu>לתפריט</button></div>`);
+    if (won) { sfx('win'); for (let i = 0; i < r.stars; i++) sfx('star', 0.3 + i * 0.35); } else sfx('lose');
     paintShop();
-    cardWrap.querySelector('[data-shop]')!.addEventListener('click', (e) => {
+    cardWrap.querySelector('[data-shop]')?.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-up]') as HTMLButtonElement | null;
       if (!b || b.disabled || !shopSave) return;
       const u = upgrades.find((x) => x.id === b.dataset.up)!;
@@ -436,10 +545,26 @@ export function createUi(): UiApi & UiExtra {
       const res = h.buyUpgrade(u.id);
       if (!res.ok) return say(res.reason ?? 'אין מספיק מטבעות');
       shopSave.coins -= cost; shopSave.upgrades[u.id]++; // local mirror of what the handler persisted
-      say('שודרג!'); paintShop();
+      sfx('coin'); say('שודרג!'); paintShop();
       const sum = cardWrap.querySelectorAll('.sum b')[2]; if (sum) sum.textContent = fmt(shopSave.coins);
     });
-    cardWrap.querySelector('[data-next]')!.addEventListener('click', () => { if (next) showDayStart(next, shopSave!); else hideCard(); });
+    on('[data-next]', () => { if (next) showDayStart(next, shopSave!); else showEnding(shopSave!); });
+    on('[data-menu]', () => h.toMenu());
+  }
+
+  /** After the last day: the whole run in one card, then the map (chase 3 stars) or the menu. */
+  function showEnding(save: Save) {
+    const n = totalStars(save), max = LEVELS.length * 3;
+    showCard(`<div class="confetti" aria-hidden="true">${Array.from({ length: 18 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--d:${(i % 6) * 0.25}s;--c:${['#FFCC00', '#29a3dd', '#E5484D', '#4CAF50'][i % 4]}"></i>`).join('')}</div>` +
+      LOGO + `<h2>סיימתם את כל ${LEVELS.length} הימים!</h2>` +
+      `<div class="ui-sub dark">עברתם ${new Set(LEVELS.map((l) => cityName(l.id))).size} ערים, מאתר הבנייה הראשון ועד מסיבת פורים בעיר הלילה. הצי של בראשית מוכן לכל אירוע.</div>` +
+      `<div class="stats"><div><b>${n}</b><span>כוכבים מתוך ${max}</span></div><div><b>${fmt(save.coins)}</b><span>בקופה</span></div><div><b>${LEVELS.filter((l) => save.stars[l.id] === 3).length}</b><span>ימים מושלמים</span></div></div>` +
+      (n < max ? `<div class="ui-sub dark">רוצים את כל הכוכבים? כל יום פתוח במפת השלבים.</div>` : `<div class="ui-sub dark">כל הכוכבים! אלופי השירות של בראשית.</div>`) +
+      `<div class="soon">🏙️ <b>עיר חדשה בקרוב</b></div>` +
+      `<div class="foot"><button class="btn go" data-map>למפת השלבים</button><button class="btn alt" data-menu>לתפריט הראשי</button></div>`, 'ending');
+    sfx('win');
+    on('[data-map]', () => { mapFrom = () => showEnding(save); showMap(save); });
+    on('[data-menu]', () => h.toMenu());
   }
 
   function paintShop() {
@@ -452,5 +577,5 @@ export function createUi(): UiApi & UiExtra {
     }).join('');
   }
 
-  return { mount, update, select, showDayStart, showDayEnd, setView: (fn) => { view = fn; }, setPause: (fn) => { rawPause = fn; } };
+  return { mount, update, select, showDayStart, showDayEnd, showTitle, begin, setView: (fn) => { view = fn; }, setPause: (fn) => { rawPause = fn; } };
 }
