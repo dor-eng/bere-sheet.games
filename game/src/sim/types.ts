@@ -101,6 +101,7 @@ export interface RenderApi {
 export interface UiHandlers {
   command(c: Command): CommandResult;
   startDay(): void; // from the pre-day / end card
+  restart(): void; // wipe progress, back to day 1
   buyUpgrade(id: UpgradeDef['id']): { ok: boolean; reason?: string };
   setSpeed(x: 1 | 2 | 3): void;
   focus(x: number, y: number, dyPx?: number): void; // edge-arrow tap -> camera

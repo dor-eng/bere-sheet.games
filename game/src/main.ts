@@ -32,6 +32,7 @@ ui.mount(document.getElementById('ui')!, {
   command: (c) => command(state, c),
   startDay: () => { if (mapOf(level().city) !== map) { location.reload(); return; } state = createDay(level(), map, save); running = true; },
   buyUpgrade: (id) => { const r = buyUpgrade(save, id); if (r.ok) { save = r.save; persist(); } return r; },
+  restart: () => { localStorage.removeItem(KEY); location.reload(); },
   setSpeed: (x) => { speed = x; },
   focus: (x, y, dy) => render.focus(x, y, dy),
 });

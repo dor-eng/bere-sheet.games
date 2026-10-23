@@ -387,9 +387,11 @@ export function createUi(): UiApi & UiExtra {
       `<h4>המטרה</h4><ul class="rules"><li>${STAR.replace('<svg', '<svg width="26" height="26"')} כוכב: מסיימים את היום ברווח (שכר פחות קנסות גדול מאפס)</li>` +
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שני כוכבים: גם עומס יתר של עד ${ECON.feeOverflowTolerance} שניות בסך הכל</li>` +
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שלושה: גם רווח של ${fmt(level.coinTarget)} ${COIN} ביום (הרווח של היום, לא מה שבקופה)</li></ul>` +
-      `<button class="btn go" data-go>יוצאים לעבודה</button><button class="btn alt" data-how style="margin-top:8px">איך משחקים?</button>`);
+      `<button class="btn go" data-go>${level.id > 1 ? `ממשיכים מיום ${level.id}` : 'יוצאים לעבודה'}</button><button class="btn alt" data-how style="margin-top:8px">איך משחקים?</button>` +
+      (level.id > 1 ? `<button class="btn alt" data-restart style="margin-top:8px">מתחילים מחדש מיום 1</button>` : ''));
     cardWrap.querySelector('[data-go]')!.addEventListener('click', () => { hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(); guideStart(level, save); });
     cardWrap.querySelector('[data-how]')!.addEventListener('click', () => showHowTo(() => showDayStart(level, save)));
+    cardWrap.querySelector('[data-restart]')?.addEventListener('click', () => { if (confirm('להתחיל מחדש מיום 1? כל הכוכבים, המטבעות והשדרוגים יימחקו')) h.restart(); });
   }
 
   /** Main reason the day lost stars: the site with the biggest loss (fine + forfeited fee), with one tip. Null when nothing to say. */
