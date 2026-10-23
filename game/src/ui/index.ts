@@ -50,6 +50,8 @@ const setHtml = (e: HTMLElement, h: string) => { if (e.dataset.h !== h) { e.data
 export interface UiExtra {
   /** Optional: world->screen projection from render (null = unknown). Enables edge arrows; otherwise alerts are shown as chips. */
   setView(fn: ((x: number, y: number) => { x: number; y: number } | null) | null): void;
+  /** The guided first day pauses the sim through this (main.ts owns the flag). */
+  setPause(fn: (p: boolean) => void): void;
 }
 
 export function createUi(): UiApi & UiExtra {
@@ -68,7 +70,7 @@ export function createUi(): UiApi & UiExtra {
   let book: { s: GameState; over: Set<string>; noCab: Map<string, number>; t: number; minCoins: number } | null = null;
 
   const say = (msg: string) => { toast.textContent = msg; toast.classList.add('on'); clearTimeout(toastT); toastT = window.setTimeout(() => toast.classList.remove('on'), 2200); };
-  const run = (c: Parameters<UiHandlers['command']>[0], okMsg?: string) => { const r = h.command(c); if (!r.ok) say(r.reason ?? 'לא הצלחנו, נסו שוב'); else if (okMsg) say(okMsg); else if (c.type === 'recall') say('המשאבה חוזרת הביתה'); else say(c.type === 'service' ? 'המשאבה בדרך!' : 'התאים בדרך!'); return r; };
+  const run = (c: Parameters<UiHandlers['command']>[0], okMsg?: string) => { const r = h.command(c); if (r.ok) noteCmd(c); if (!r.ok) say(r.reason ?? 'לא הצלחנו, נסו שוב'); else if (okMsg) say(okMsg); else if (c.type === 'recall') say('המשאבה חוזרת הביתה'); else say(c.type === 'service' ? 'המשאבה בדרך!' : 'התאים בדרך!'); return r; };
   /** How many cabins a deliver command would really bring: min(truck carry, clean stock, free slots) - same as sim command(). */
   const deliverable = (s: GameState, siteId: string) => {
     const st = s.sites.find((x) => x.def.id === siteId), spot = st && s.map.spots.find((p) => p.id === st.def.spotId);
@@ -103,7 +105,12 @@ export function createUi(): UiApi & UiExtra {
     toast = el('ui-toast');
     cardWrap = el('ui-card-wrap ui-hidden');
     alertChips.addEventListener('click', onAlert); arrows.addEventListener('click', onAlert);
-    root.append(hud, chips, arrows, alertChips, sheet, toast, cardWrap);
+    bubble = el('ui-guide ui-hidden'); finger = el('ui-finger ui-hidden'); finger.textContent = '👇';
+    bubble.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('[data-g]') as HTMLElement | null;
+      if (b?.dataset.g === 'skip') guideStop(true); else if (b?.dataset.g === 'ok') { g.ack = true; }
+    });
+    root.append(hud, chips, arrows, alertChips, sheet, toast, finger, bubble, cardWrap);
   }
 
   function paintSpeed() { speedEl.querySelectorAll('button').forEach((b) => b.classList.toggle('on', +(b as HTMLElement).dataset.sp! === speed)); }
@@ -213,6 +220,7 @@ export function createUi(): UiApi & UiExtra {
     // alerts: sites overflowing / open with no cabins RIGHT NOW (from events, not history), or a cabin nearly full
     const hot = s.sites.filter((st) => st.open && !st.closed && (book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id) || s.cabins.some((c) => c.siteId === st.def.id && c.fill / (c.capacity || 1) >= 0.85)));
     paintAlerts(hot, s);
+    guideTick(s);
     // slow lane (4Hz): history + open sheet
     const now = performance.now();
     if (now - lastSlow > 250) {
@@ -260,6 +268,63 @@ export function createUi(): UiApi & UiExtra {
     const st = last.sites.find((x) => x.def.id === b.dataset.site); if (st) { h.focus(st.x, st.y); select({ kind: 'site', id: st.def.id }, last); }
   };
 
+
+  // ---------- guided first day (level 1, fresh save): a step list + one bubble; the sim pauses while a step waits for the player ----------
+  type Step = { id: string; pause: boolean; ok?: boolean; site?: (s: GameState) => string | undefined; act?: 'deliver' | 'service'; trig: (s: GameState) => boolean; done: (s: GameState) => boolean; text: (s: GameState) => string };
+  let bubble: HTMLElement, finger: HTMLElement, setPause: (p: boolean) => void = () => {};
+  let guideSkipped = false;
+  const g = { on: false, delivered: new Map<string, number>(), pumps: 0, ack: false, endAt: 0 };
+  const noteCmd = (c: Parameters<UiHandlers['command']>[0]) => {
+    if (c.type === 'deliver') g.delivered.set(c.siteId, (g.delivered.get(c.siteId) ?? 0) + 1);
+    else if (c.type === 'service') g.pumps++;
+  };
+  const atSite = (s: GameState, id?: string) => s.cabins.filter((c) => c.siteId === id).length;
+  const hotCabin = (s: GameState) => s.cabins.find((c) => c.siteId !== null && c.fill / (c.capacity || 1) >= 0.6);
+  const truckReady = (s: GameState) => s.trucks.some((t) => t.job === 'idle' && t.path[t.path.length - 1] === s.map.depotNodeId);
+  const nm = (s: GameState, id?: string) => shortName(s.sites.find((x) => x.def.id === id)?.def.name ?? '');
+  const STEPS: Step[] = [
+    { id: 'place1', pause: true, act: 'deliver', site: (s) => s.sites[0]?.def.id, trig: () => true,
+      done: (s) => !!g.delivered.get(s.sites[0]?.def.id) || atSite(s, s.sites[0]?.def.id) > 0 || s.sites[0]?.closed || s.time > s.sites[0]?.def.openAt + 30 || !s.cabins.some(clean),
+      text: (s) => sel?.kind === 'site' && sel.id === s.sites[0]?.def.id ? 'לחצו על "הצב תאים" כדי להביא תא אחד' : `לחצו על ${nm(s, s.sites[0]?.def.id)} במפה: שם מציבים את התא הראשון` },
+    { id: 'watch', pause: false, trig: (s) => !!g.delivered.get(s.sites[0]?.def.id), done: (s) => atSite(s, s.sites[0]?.def.id) > 0 || s.time >= s.sites[1]?.def.openAt - 40,
+      text: () => 'המשאית מביאה את התא. מחכים רגע' },
+    { id: 'place2', pause: true, act: 'deliver', site: (s) => s.sites[1]?.def.id, trig: (s) => s.sites.length > 1 && s.time >= s.sites[1].def.openAt - 40,
+      done: (s) => atSite(s, s.sites[1]?.def.id) > 1 || (g.delivered.get(s.sites[1]?.def.id) ?? 0) > 0 || s.sites[1]?.open || !s.cabins.some(clean),
+      text: (s) => sel?.kind === 'site' && sel.id === s.sites[1]?.def.id ? 'מעלים ל-2 עם הפלוס ולוחצים "הצב תאים"' : `${nm(s, s.sites[1]?.def.id)} נפתח עוד רגע. לחצו עליו והציבו 2 תאים לפני שהאורחים מגיעים` },
+    { id: 'pump', pause: true, act: 'service', site: (s) => hotCabin(s)?.siteId ?? undefined, trig: (s) => !!hotCabin(s) && s.time > 20, done: () => g.pumps > 0,
+      text: (s) => sel?.kind === 'site' && sel.id === hotCabin(s)?.siteId ? 'לחצו "שלח משאבה"' : `תא ב${nm(s, hotCabin(s)?.siteId ?? undefined)} התמלא ברובו. לחצו על האתר ושלחו משאבה לפני שיגלוש` },
+    { id: 'info', pause: true, ok: true, trig: () => g.pumps > 0, done: () => g.ack, text: () => 'האירוע משלם כשהוא נגמר. אפשר לזרז את השעון עם 2x ו-3x' },
+    { id: 'end', pause: false, trig: () => g.ack, done: () => g.endAt > 0 && performance.now() > g.endAt, text: () => 'זהו, מכאן לבד: מציבים תאים לפני האירוע, שואבים לפני שמתמלא' },
+  ];
+  function guideStart(level: LevelDef, save: Save) {
+    g.delivered.clear(); g.pumps = 0; g.ack = false; g.endAt = 0;
+    g.on = level.id === 1 && !Object.keys(save.stars).length && !guideSkipped;
+  }
+  function guideStop(skip: boolean) { if (skip) guideSkipped = true; g.on = false; setPause(false); bubble.classList.add('ui-hidden'); finger.classList.add('ui-hidden'); sheet.querySelectorAll('.guide-pulse').forEach((b) => b.classList.remove('guide-pulse')); }
+  function guideTick(s: GameState) {
+    if (!g.on) return;
+    if (s.over || s.level.id !== 1) return guideStop(false);
+    const step = STEPS.find((x) => !x.done(s) && x.trig(s));
+    if (!step) { setPause(false); bubble.classList.add('ui-hidden'); finger.classList.add('ui-hidden'); return; }
+    if (step.id === 'end' && !g.endAt) g.endAt = performance.now() + 7000;
+    if (step.id === 'end' && g.endAt && performance.now() > g.endAt) return guideStop(false);
+    const wait = step.act === 'deliver' && !truckReady(s) || step.act === 'service' && !s.trucks.some((t) => t.job === 'idle');
+    setPause(step.pause && !wait);
+    const target = step.site?.(s), pt = target ? s.sites.find((x) => x.def.id === target) : undefined;
+    if (pt && step.pause && stepFocused !== step.id) { stepFocused = step.id; h.focus(pt.x, pt.y); }
+    const txt = wait ? 'מחכים שהמשאית תתפנה' : step.text(s);
+    setHtml(bubble, `<span>${esc(txt)}</span>${step.ok ? '<button class="btn go" data-g="ok">הבנתי</button>' : ''}<a data-g="skip">דלג על ההדרכה</a>`);
+    bubble.classList.remove('ui-hidden');
+    const top = Math.max(chips.getBoundingClientRect().bottom, hud.getBoundingClientRect().bottom) + 8 - root.getBoundingClientRect().top;
+    bubble.style.top = Math.round(top) + 'px';
+    // finger over the site on the map; pulse the button in the sheet
+    const onSheetOf = sel?.kind === 'site' && sel.id === target;
+    const p = pt && view && !wait && !onSheetOf ? view(pt.x, pt.y) : null;
+    if (p && p.x > 0 && p.x < root.clientWidth && p.y > 0) { finger.style.left = p.x + 'px'; finger.style.top = Math.max(top + 70, p.y - 90) + 'px'; finger.classList.remove('ui-hidden'); } else finger.classList.add('ui-hidden');
+    sheet.querySelectorAll('[data-act]').forEach((b) => b.classList.toggle('guide-pulse', onSheetOf && !wait && (b as HTMLElement).dataset.act === step.act));
+  }
+  let stepFocused = '';
+
   // ---------- cards ----------
   const showCard = (inner: string) => { cardWrap.innerHTML = `<div class="ui-card">${inner}</div>`; cardWrap.classList.remove('ui-hidden'); hud.classList.add('ui-hidden'); chips.classList.add('ui-hidden'); sheet.classList.add('ui-hidden'); arrows.style.display = 'none'; alertChips.style.display = 'none'; sel = null; };
   const hideCard = () => { cardWrap.classList.add('ui-hidden'); cardWrap.textContent = ''; hud.classList.remove('ui-hidden'); chips.classList.remove('ui-hidden'); arrows.style.display = ''; alertChips.style.display = ''; };
@@ -293,7 +358,7 @@ export function createUi(): UiApi & UiExtra {
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שני כוכבים: גם עומס יתר של עד ${ECON.feeOverflowTolerance} שניות בסך הכל</li>` +
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שלושה: גם רווח של ${fmt(level.coinTarget)} ${COIN} ביום (הרווח של היום, לא מה שבקופה)</li></ul>` +
       `<button class="btn go" data-go>יוצאים לעבודה</button><button class="btn alt" data-how style="margin-top:8px">איך משחקים?</button>`);
-    cardWrap.querySelector('[data-go]')!.addEventListener('click', () => { hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(); });
+    cardWrap.querySelector('[data-go]')!.addEventListener('click', () => { hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(); guideStart(level, save); });
     cardWrap.querySelector('[data-how]')!.addEventListener('click', () => showHowTo(() => showDayStart(level, save)));
   }
 
@@ -354,5 +419,5 @@ export function createUi(): UiApi & UiExtra {
     }).join('');
   }
 
-  return { mount, update, select, showDayStart, showDayEnd, setView: (fn) => { view = fn; } };
+  return { mount, update, select, showDayStart, showDayEnd, setView: (fn) => { view = fn; }, setPause: (fn) => { setPause = fn; } };
 }

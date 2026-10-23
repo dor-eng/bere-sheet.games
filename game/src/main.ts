@@ -22,7 +22,7 @@ const mapOf = (id?: string) => ((id === 'city-beach' ? cityBeach : id === 'city-
 const map = mapOf(level().city); // ponytail: a new city reloads the page (render mounts once); live swap when cities need it
 
 let state: GameState = createDay(level(), map, save);
-let running = false, speed: 1 | 2 | 3 = 1;
+let running = false, paused = false, speed: 1 | 2 | 3 = 1;
 const render = createRender();
 const ui = createUi();
 
@@ -35,6 +35,7 @@ ui.mount(document.getElementById('ui')!, {
   setSpeed: (x) => { speed = x; },
   focus: (x, y) => render.focus(x, y),
 });
+ui.setPause((p) => { paused = p; }); // the guided first day holds the clock while it waits for a tap
 ui.setView((x, y) => render.view(x, y)); // world -> screen, enables off-screen edge arrows
 ui.showDayStart(level(), save);
 (window as any).__game = { get state() { return state; }, get save() { return save; }, command: (c: any) => command(state, c), focus: (x: number, y: number) => render.focus(x, y) }; // test hook
@@ -44,7 +45,8 @@ const STEP = 1 / 30;
 let acc = 0;
 function frame(now: number) {
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
-  if (running) {
+  if (paused) acc = 0;
+  if (running && !paused) {
     acc += dt * speed;
     const evs: GameEvent[] = []; // step() keeps only its own events: hand render/ui every event of this frame
     while (acc >= STEP && !state.over) { step(state, STEP); acc -= STEP; evs.push(...state.events); }
