@@ -86,12 +86,13 @@ export function createUi(): UiApi & UiExtra {
     root = r; h = handlers; root.textContent = '';
     hud = el('ui-hud ui-hidden');
     hud.innerHTML = `<div class="ui-coins">${COIN}<span data-k="coins">0</span></div><div class="ui-clock" data-k="clock">06:00</div>` +
-      `<div class="ui-speed">${[1, 2, 3].map((x) => `<button data-sp="${x}" aria-label="מהירות ${x}">${x}x</button>`).join('')}</div><div class="ui-goal"><span data-k="goal"></span><span data-k="stars"></span></div><div class="ui-prog"><i></i><em data-k="left"></em></div>`;
+      `<div class="ui-speed">${[1, 2, 3].map((x) => `<button data-sp="${x}" aria-label="מהירות ${x}">${x}x</button>`).join('')}<button data-help aria-label="עצירה וחוקים"><i class="pz"></i></button></div><div class="ui-goal"><span data-k="goal"></span><span data-k="stars"></span></div><div class="ui-prog"><i></i><em data-k="left"></em></div>`;
     coinsEl = hud.querySelector('[data-k=coins]')!; clockEl = hud.querySelector('[data-k=clock]')!;
     progEl = hud.querySelector('.ui-prog i')!; goalEl = hud.querySelector('[data-k=goal]')!; starsEl = hud.querySelector('[data-k=stars]')!; leftEl = hud.querySelector('[data-k=left]')!; speedEl = hud.querySelector('.ui-speed')!;
     hud.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-sp]') as HTMLElement | null;
       if (b) { speed = +b.dataset.sp! as 1 | 2 | 3; h.setSpeed(speed); paintSpeed(); }
+      else if ((e.target as HTMLElement).closest('[data-help]') && last && !last.over) openHelp();
     });
     paintSpeed();
     chips = el('ui-chips ui-hidden');
@@ -273,7 +274,14 @@ export function createUi(): UiApi & UiExtra {
 
   // ---------- guided first day (level 1, fresh save): a step list + one bubble; the sim pauses while a step waits for the player ----------
   type Step = { id: string; pause: boolean; ok?: boolean; qty?: number; site?: (s: GameState) => string | undefined; act?: 'deliver' | 'service'; trig: (s: GameState) => boolean; done: (s: GameState) => boolean; text: (s: GameState) => string };
-  let bubble: HTMLElement, finger: HTMLElement, setPause: (p: boolean) => void = () => {};
+  let bubble: HTMLElement, finger: HTMLElement, rawPause: (p: boolean) => void = () => {};
+  // the clock stops while the guide waits for a tap or while the pause/rules card is open
+  let guidePause = false, helpOpen = false;
+  const setPause = (p: boolean) => { guidePause = p; rawPause(p || helpOpen); };
+  function openHelp() {
+    helpOpen = true; setPause(guidePause); bubble.classList.add('ui-hidden'); finger.classList.add('ui-hidden');
+    showHowTo(() => { hideCard(); helpOpen = false; setPause(guidePause); }, true);
+  }
   let guideSkipped = false;
   const g = { on: false, delivered: new Map<string, number>(), pumps: 0, ack: false, endAt: 0 };
   const noteCmd = (c: Parameters<UiHandlers['command']>[0]) => {
@@ -308,7 +316,7 @@ export function createUi(): UiApi & UiExtra {
   }
   function guideStop(skip: boolean) { if (skip) guideSkipped = true; g.on = false; setPause(false); bubble.classList.add('ui-hidden'); finger.classList.add('ui-hidden'); sheet.querySelectorAll('.guide-pulse').forEach((b) => b.classList.remove('guide-pulse')); }
   function guideTick(s: GameState) {
-    if (!g.on) return;
+    if (!g.on || helpOpen) return;
     if (s.over || s.level.id !== 1) return guideStop(false);
     const step = STEPS.find((x) => !x.done(s) && x.trig(s));
     if (!step) { setPause(false); bubble.classList.add('ui-hidden'); finger.classList.add('ui-hidden'); return; }
@@ -343,9 +351,9 @@ export function createUi(): UiApi & UiExtra {
   const hideCard = () => { cardWrap.classList.add('ui-hidden'); cardWrap.textContent = ''; hud.classList.remove('ui-hidden'); chips.classList.remove('ui-hidden'); arrows.style.display = ''; alertChips.style.display = ''; };
 
   /** How to play: shown before day 1 of a new game and from the day card button. */
-  function showHowTo(then: () => void) {
+  function showHowTo(then: () => void, paused = false) {
     showCard(`<div class="logo"><img src="/play/assets/logo-white.svg" alt="בראשית"></div>` +
-      `<h2>איך משחקים</h2>` +
+      (paused ? `<h2>המשחק עצור</h2><div class="ui-sub" style="color:#4a5a6a">השעון לא זז עד שחוזרים לשחק. תזכורת לחוקים:</div>` : `<h2>איך משחקים</h2>`) +
       `<div class="ui-sub" style="color:#4a5a6a">אתם מנהלים את משאיות השירותים של בראשית. אין יריב: משחקים נגד השעון.</div>` +
       `<ul class="rules">` +
       `<li>🎉 <span>בכל יום יש אירועים בעיר: חתונות, הופעות, אתרי בנייה. האורחים משתמשים בתאים והתאים מתמלאים.</span></li>` +
@@ -355,7 +363,7 @@ export function createUi(): UiApi & UiExtra {
       `<li>⏰ <span>גם אתר פתוח <b>בלי תאים</b> מקבל קנס. מציבים תאים <b>לפני</b> שהאירוע נפתח.</span></li>` +
       `<li>${COIN} <span>התשלום מגיע כשהאירוע נגמר, ואובד אם היה עומס יתר ארוך. בכסף קונים שדרוגים.</span></li>` +
       `</ul>` +
-      `<button class="btn go" data-ok>הבנתי, יאללה</button>`);
+      `<button class="btn go" data-ok>${paused ? 'חוזרים לשחק' : 'הבנתי, יאללה'}</button>`);
     cardWrap.querySelector('[data-ok]')!.addEventListener('click', then);
   }
 
@@ -432,5 +440,5 @@ export function createUi(): UiApi & UiExtra {
     }).join('');
   }
 
-  return { mount, update, select, showDayStart, showDayEnd, setView: (fn) => { view = fn; }, setPause: (fn) => { setPause = fn; } };
+  return { mount, update, select, showDayStart, showDayEnd, setView: (fn) => { view = fn; }, setPause: (fn) => { rawPause = fn; } };
 }

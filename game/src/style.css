@@ -16,6 +16,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0e2a47; tou
 .ui-speed button { min-width: 44px; min-height: 44px; border: 3px solid var(--ink); border-radius: 14px; background: #fff9e8; font-weight: 900; font-size: 15px; box-shadow: 0 3px 0 var(--ink); }
 .ui-speed button.on { background: var(--yellow); }
 .ui-speed button:active { transform: translateY(3px); box-shadow: none; }
+.ui-speed .pz { display: inline-block; width: 12px; height: 15px; border-left: 4px solid var(--ink); border-right: 4px solid var(--ink); box-sizing: border-box; vertical-align: middle; }
 .ui-goal { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; margin-top: -2px; }
 .ui-goal b { font-size: 17px; font-weight: 900; color: #9be37a; direction: ltr; unicode-bidi: isolate; display: inline-block; } .ui-goal b.neg { color: #ff8b8b; }
 .ui-goal i { font-style: normal; font-size: 20px; color: #7f95a8; } .ui-goal i.on { color: var(--yellow); text-shadow: 0 1px 0 var(--ink); }
