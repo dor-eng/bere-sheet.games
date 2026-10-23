@@ -9,12 +9,13 @@ import cityCapital from './data/city-capital.json';
 import cityShows from './data/city-shows.json';
 import cityIndustry from './data/city-industry.json';
 import cityValley from './data/city-valley.json';
+import cityDesert from './data/city-desert.json';
 
 const KEY = 'bereshit.save.v1';
 let save: Save = JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? newSave();
 const persist = () => localStorage.setItem(KEY, JSON.stringify(save));
 const level = () => LEVELS[Math.min(save.level, LEVELS.length) - 1];
-const mapOf = (id?: string) => ((id === 'city-beach' ? cityBeach : id === 'city-capital' ? cityCapital : id === 'city-shows' ? cityShows : id === 'city-industry' ? cityIndustry : id === 'city-valley' ? cityValley : cityReal) as CityMap);
+const mapOf = (id?: string) => ((id === 'city-beach' ? cityBeach : id === 'city-capital' ? cityCapital : id === 'city-shows' ? cityShows : id === 'city-industry' ? cityIndustry : id === 'city-valley' ? cityValley : id === 'city-desert' ? cityDesert : cityReal) as CityMap);
 const map = mapOf(level().city); // ponytail: a new city reloads the page (render mounts once); live swap when cities need it
 
 let state: GameState = createDay(level(), map, save);

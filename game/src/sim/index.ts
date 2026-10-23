@@ -173,7 +173,7 @@ function closeSite(s: GameState, site: SiteState) {
     s.events.push({ kind: 'paid', siteId: site.def.id, amount: site.def.fee });
   }
   // ponytail: cabins are hauled back instantly; a pickup trip is a later mechanic
-  for (const c of cabinsAt(s, site.def.id)) { c.siteId = null; c.slot = STOCK_SLOT; c.fill = 0; c.washT = ECON.wash.sec; }
+  for (const c of cabinsAt(s, site.def.id)) { c.siteId = null; c.slot = STOCK_SLOT; c.fill = 0; c.washT = s.level.washSec ?? ECON.wash.sec; }
 }
 
 /** Wash center: the first `bays` dirty cabins in the depot wash in parallel. */

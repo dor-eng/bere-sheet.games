@@ -1675,8 +1675,8 @@
   "maxTank": 200,
   "unlock": {
    "kind": "city",
-   "name": "בקרוב",
-   "desc": "בקרוב: עוד עיר ועוד אירועים",
+   "name": "מדבר",
+   "desc": "הבא: המדבר. מעט מים, שטיפת תא לוקחת הרבה יותר זמן",
    "icon": "icon-star"
   },
   "sites": [
@@ -1756,6 +1756,307 @@
      ]
     ],
     "fee": 200,
+    "serviceTip": 14,
+    "overflowFinePerSec": 3
+   }
+  ]
+ },
+ {
+  "id": 19,
+  "title": "אימון בשטח",
+  "dayLength": 270,
+  "coinTarget": 800,
+  "city": "city-desert",
+  "washSec": 60,
+  "unlock": {
+   "kind": "mechanic",
+   "name": "מסיבת מדבר",
+   "desc": "הבא: מסיבת מדבר עד הבוקר, בסוף דרך חול ארוכה",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s1",
+    "type": "construction",
+    "name": "בסיס צבאי - אימון בשטח",
+    "spotId": "spot-army",
+    "openAt": 20,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.9
+     ],
+     [
+      60,
+      1.4
+     ],
+     [
+      150,
+      1.7
+     ],
+     [
+      220,
+      1.1
+     ]
+    ],
+    "fee": 240,
+    "serviceTip": 12,
+    "overflowFinePerSec": 2.5
+   },
+   {
+    "id": "s2",
+    "type": "construction",
+    "name": "תחנת הדלק - עבודות",
+    "spotId": "spot-gas",
+    "openAt": 50,
+    "closeAt": 200,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      1.3
+     ],
+     [
+      120,
+      1.0
+     ]
+    ],
+    "fee": 180,
+    "serviceTip": 10,
+    "overflowFinePerSec": 2
+   },
+   {
+    "id": "s3",
+    "type": "wedding",
+    "name": "נאות המדבר - חתונה",
+    "spotId": "spot-oasis",
+    "openAt": 120,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.3
+     ],
+     [
+      15,
+      2.0
+     ],
+     [
+      45,
+      2.8
+     ],
+     [
+      90,
+      1.6
+     ]
+    ],
+    "fee": 260,
+    "serviceTip": 16,
+    "overflowFinePerSec": 3.5
+   }
+  ]
+ },
+ {
+  "id": 20,
+  "title": "מסיבת מדבר",
+  "dayLength": 280,
+  "coinTarget": 840,
+  "city": "city-desert",
+  "washSec": 60,
+  "unlock": {
+   "kind": "site",
+   "name": "חוות אקולוגית",
+   "desc": "הבא: מחנה אקולוגי, אורחים כל היום ומעט מים",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s4",
+    "type": "show",
+    "name": "הדיונות - מסיבת מדבר",
+    "spotId": "spot-rave",
+    "openAt": 60,
+    "closeAt": 275,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      40,
+      1.5
+     ],
+     [
+      100,
+      2.0
+     ],
+     [
+      180,
+      1.6
+     ],
+     [
+      240,
+      0.8
+     ]
+    ],
+    "fee": 320,
+    "serviceTip": 18,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s5",
+    "type": "construction",
+    "name": "בסיס צבאי - אימון בשטח",
+    "spotId": "spot-army",
+    "openAt": 20,
+    "closeAt": 220,
+    "usage": [
+     [
+      0,
+      0.9
+     ],
+     [
+      60,
+      1.4
+     ],
+     [
+      150,
+      1.6
+     ]
+    ],
+    "fee": 220,
+    "serviceTip": 12,
+    "overflowFinePerSec": 2.5
+   },
+   {
+    "id": "s6",
+    "type": "construction",
+    "name": "תחנת הדלק - עבודות",
+    "spotId": "spot-gas",
+    "openAt": 90,
+    "closeAt": 265,
+    "usage": [
+     [
+      0,
+      0.8
+     ],
+     [
+      60,
+      1.3
+     ],
+     [
+      120,
+      1.0
+     ]
+    ],
+    "fee": 170,
+    "serviceTip": 10,
+    "overflowFinePerSec": 2
+   }
+  ]
+ },
+ {
+  "id": 21,
+  "title": "מחנה אקולוגי",
+  "dayLength": 280,
+  "coinTarget": 860,
+  "city": "city-desert",
+  "washSec": 70,
+  "unlock": {
+   "kind": "city",
+   "name": "בקרוב",
+   "desc": "בקרוב: עוד עיר ועוד אירועים",
+   "icon": "icon-star"
+  },
+  "sites": [
+   {
+    "id": "s7",
+    "type": "wedding",
+    "name": "מחנה אקולוגי - סוף שבוע",
+    "spotId": "spot-eco",
+    "openAt": 30,
+    "closeAt": 275,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      40,
+      1.4
+     ],
+     [
+      120,
+      1.8
+     ],
+     [
+      200,
+      1.2
+     ]
+    ],
+    "fee": 300,
+    "serviceTip": 16,
+    "overflowFinePerSec": 3
+   },
+   {
+    "id": "s8",
+    "type": "show",
+    "name": "הדיונות - הופעה בזריחה",
+    "spotId": "spot-rave",
+    "openAt": 120,
+    "closeAt": 260,
+    "usage": [
+     [
+      0,
+      0.6
+     ],
+     [
+      20,
+      2.4
+     ],
+     [
+      60,
+      2.8
+     ],
+     [
+      100,
+      1.2
+     ]
+    ],
+    "fee": 260,
+    "serviceTip": 16,
+    "overflowFinePerSec": 3.5
+   },
+   {
+    "id": "s9",
+    "type": "wedding",
+    "name": "נאות המדבר - חתונה",
+    "spotId": "spot-oasis",
+    "openAt": 60,
+    "closeAt": 200,
+    "usage": [
+     [
+      0,
+      0.3
+     ],
+     [
+      15,
+      2.0
+     ],
+     [
+      45,
+      2.6
+     ],
+     [
+      90,
+      1.4
+     ]
+    ],
+    "fee": 240,
     "serviceTip": 14,
     "overflowFinePerSec": 3
    }

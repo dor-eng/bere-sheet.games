@@ -7,6 +7,7 @@ import cityCapital from '../data/city-capital.json' with { type: 'json' };
 import cityShows from '../data/city-shows.json' with { type: 'json' };
 import cityIndustry from '../data/city-industry.json' with { type: 'json' };
 import cityValley from '../data/city-valley.json' with { type: 'json' };
+import cityDesert from '../data/city-desert.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
 import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, gateCrowded, LEVELS, UPGRADES, ECON } from './index.ts';
 
@@ -223,7 +224,7 @@ test('economy: applyResult advances + keeps best stars, upgrades cost + cap', ()
   for (let i = 0; i < 3; i++) { const r = buyUpgrade(cur, 'pump'); assert.ok(r.ok); cur = r.save; }
   assert.equal(cur.upgrades.pump, 3); assert.equal(buyUpgrade(cur, 'pump').ok, false);
   for (const u of UPGRADES) { assert.equal(u.values.length, 4); assert.equal(u.costs.length, 3); }
-  assert.equal(LEVELS.length, 18);
+  assert.equal(LEVELS.length, 21);
   const s3 = createDay(LEVELS[0], map, cur);
   assert.equal(s3.trucks[0].pumpRate, 70);
 });
@@ -553,7 +554,7 @@ test('valley: levels 16-18 use the valley map with small trucks only; L18 unlock
     assert.ok(l.maxTank && l.maxTank <= UPGRADES.find((u) => u.id === 'tank')!.values[0], 'L' + l.id);
     for (const st of l.sites) assert.ok(valley.spots.some((p) => p.id === st.spotId), st.spotId);
   }
-  assert.equal(LEVELS.find((l) => l.id === 18)!.unlock.name, 'בקרוב');
+  assert.equal(LEVELS.find((l) => l.id === 18)!.unlock.name, 'מדבר');
 });
 test('small truck: level maxTank caps a bought big tank; no maxTank = bought tank (neg control)', () => {
   const save: Save = { coins: 0, level: 16, stars: {}, upgrades: { pump: 0, tank: 3, cabin: 0 } };
@@ -567,6 +568,48 @@ test('valley play: bot reaches day end with >=1 star on L16-L18 even with the sm
   const save: Save = { coins: 0, level: 16, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
   for (const l of LEVELS.filter((x) => x.city === 'city-valley')) {
     const s = createDay(l, valley, { ...save, level: l.id });
+    let n = 0;
+    while (!s.over) { if (n++ % 15 === 0) botAct(s); step(s, DT); }
+    const r = dayResult(s);
+    console.log('L' + l.id, JSON.stringify(r));
+    assert.ok(r.stars >= 1, 'L' + l.id);
+  }
+});
+const desert = cityDesert as unknown as CityMap;
+test('desert: levels 19-21 on the desert map, every site reachable, slower washing; L21 unlock = soon', () => {
+  const lv = LEVELS.filter((l) => l.city === 'city-desert');
+  assert.deepEqual(lv.map((l) => l.id), [19, 20, 21]);
+  for (const l of lv) {
+    assert.ok(l.washSec && l.washSec > ECON.wash.sec, 'L' + l.id);
+    for (const st of l.sites) {
+      const spot = desert.spots.find((p) => p.id === st.spotId)!;
+      assert.ok(spot && route(desert, desert.depotNodeId, spot.nodeId).length > 1, st.spotId);
+    }
+  }
+  assert.ok(desert.edges.filter((e) => e.kind === 'sand').length > desert.edges.filter((e) => e.kind === 'main').length);
+  assert.equal(LEVELS.find((l) => l.id === 21)!.unlock.name, 'בקרוב');
+});
+test('water scarcity: cabins back from a closed site wash for level washSec; no washSec = ECON.wash.sec (neg control)', () => {
+  const save: Save = { coins: 0, level: 19, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 3 } };
+  const base = LEVELS.find((l) => l.id === 19)!;
+  const lvl: LevelDef = { ...base, sites: [{ ...base.sites[0], openAt: 0, closeAt: 2 }] };
+  const dirtyMax = (l: LevelDef) => {
+    const s = createDay(l, desert, save);
+    while (s.time < 1) step(s, DT);
+    const site = s.sites[0].def.id;
+    const free = s.cabins.find((c) => c.siteId === null)!;
+    if (!s.cabins.some((c) => c.siteId === site)) { free.siteId = site; free.slot = 0; }
+    while (s.time < 2.2) step(s, DT);
+    return Math.max(...s.cabins.map((c) => c.washT));
+  };
+  const slow = dirtyMax(lvl), normal = dirtyMax({ ...lvl, washSec: undefined });
+  assert.ok(slow > ECON.wash.sec && slow <= 60, String(slow));
+  assert.ok(normal <= ECON.wash.sec && normal > ECON.wash.sec - 1, String(normal));
+});
+test('desert play: bot reaches day end with >=1 star on L19-L21 with slow washing', () => {
+  const save: Save = { coins: 0, level: 19, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2 } };
+  for (const l of LEVELS.filter((x) => x.city === 'city-desert')) {
+    const s = createDay(l, desert, { ...save, level: l.id });
     let n = 0;
     while (!s.over) { if (n++ % 15 === 0) botAct(s); step(s, DT); }
     const r = dayResult(s);
