@@ -90,7 +90,7 @@ function drawTankGauge(g: Graphics, ratio: number) {
 }
 
 // ---- people ----
-interface Person { c: Container; fig: Container; x: number; y: number; hx: number; hy: number; st: 'idle' | 'toCabin' | 'inside' | 'back'; t: number; tx: number; ty: number; ph: number }
+interface Person { c: Container; fig: Container; x: number; y: number; hx: number; hy: number; st: 'idle' | 'toCabin' | 'inside' | 'back'; t: number; tx: number; ty: number; ph: number; cid?: string }
 interface SiteLabel { c: Container; plate: Graphics; name: Text; stat: Text; badge: Container; badgeBg: Graphics; badgeTxt: Text; key: string; w: number; h: number; bh: number }
 interface SiteView { def: SiteDef; spot: SiteSpot; pad: Pad; people: Person[]; maxN: number; label: SiteLabel }
 
@@ -194,8 +194,12 @@ export function createRender(): RenderApi & RenderExtra {
       p.t -= dt;
       if (p.st === 'idle' && p.t <= 0) {
         const room = mine.filter((c) => c.fill < c.capacity * 0.999); // nobody walks into a full cabin: they wait nearby
-        if (room.length && open && Math.random() < 0.6) { const cb2 = room[(Math.random() * room.length) | 0]; const sp = slotPos(sv.spot, cb2.slot); p.tx = sp.x; p.ty = sp.y + 6; p.st = 'toCabin'; }
+        if (room.length && open && Math.random() < 0.6) { const cb2 = room[(Math.random() * room.length) | 0]; const sp = slotPos(sv.spot, cb2.slot); p.tx = sp.x; p.ty = sp.y + 6; p.st = 'toCabin'; p.cid = cb2.id; }
         else { p.tx = p.hx + (Math.random() - 0.5) * 50; p.ty = p.hy + (Math.random() - 0.5) * 24; p.st = 'back'; } // short stroll near home
+      }
+      if (p.st === 'toCabin') { // the cabin filled up (or left) on the way: turn back, never walk into a full cabin
+        const tc = mine.find((c) => c.id === p.cid);
+        if (!open || !tc || tc.fill >= tc.capacity * 0.999) { p.st = 'back'; p.tx = p.hx; p.ty = p.hy; }
       }
       if (p.st === 'toCabin' || p.st === 'back') {
         const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy), step = 46 * dt;
