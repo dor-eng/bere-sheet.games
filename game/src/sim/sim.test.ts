@@ -166,6 +166,28 @@ test('tank full stops pumping early and truck goes to dump', () => {
   assert.ok(s.cabins.some((c) => c.siteId === 's1' && c.fill > 70)); // second cabin only partly pumped
 });
 
+test('owner: a truck on the road with no cabins on board and room in the tank takes a new pump order', () => {
+  const s = createDay(L1, map, newSave());
+  const t = s.trucks[0];
+  command(s, { type: 'deliver', truckId: 't1', siteId: 's1', count: 2 });
+  runUntil(s, () => t.job === 'idle' && s.time > 40);
+  assert.ok(command(s, { type: 'deliver', truckId: 't1', siteId: 's2', count: 1 }).ok);
+  run(s, 1);
+  assert.equal(t.carrying, 1);
+  assert.equal(command(s, { type: 'service', truckId: 't1', siteId: 's1' }).ok, false); // cabin on board: busy (negative control)
+  runUntil(s, () => t.job === 'delivering' && t.carrying === 0 && t.seg < t.path.length - 1);
+  for (const c of s.cabins) if (c.siteId === 's1') c.fill = 60; // enough to pump
+  const r = command(s, { type: 'service', truckId: 't1', siteId: 's1' });
+  assert.ok(r.ok, r.reason);
+  assert.equal(t.job, 'toSite');
+  assert.equal(t.path[t.path.length - 1], s.map.spots.find((p) => p.id === s.sites[0].def.spotId)!.nodeId);
+  let emptied = 0;
+  runUntil(s, () => { s.events.forEach((e) => { if (e.kind === 'cabinEmptied') emptied++; }); return t.job === 'toDepot' || t.job === 'idle'; });
+  assert.ok(emptied >= 1);
+  t.tank = t.tankCap; // full tank on its way to dump: no new pump order
+  assert.equal(command(s, { type: 'service', truckId: 't1', siteId: 's1' }).ok, false);
+});
+
 test('rejections are Hebrew, truck pose updates, recall works', () => {
   const s = createDay(L1, map, newSave());
   const r = command(s, { type: 'service', truckId: 't1', siteId: 's1' });

@@ -356,6 +356,8 @@ const pumpable = (c: Cabin) => c.fill > EPS && (c.fill >= ECON.pumpMinFill || pa
 
 // ---------- commands ----------
 const no = (reason: string): CommandResult => ({ ok: false, reason });
+/** A truck takes a new pump/collect order when parked, or on the road with no cabins on board (owner: if it has room it keeps driving). */
+export const takesOrder = (t: Truck) => t.job === 'idle' || (t.carrying === 0 && (t.job === 'toDepot' || t.job === 'toSite' || t.job === 'collecting' || t.job === 'delivering'));
 const atDepotIdle = (s: GameState, t: Truck) => t.job === 'idle' && t.path[t.path.length - 1] === s.map.depotNodeId;
 
 export function command(s: GameState, c: Command): CommandResult {
@@ -373,12 +375,13 @@ export function command(s: GameState, c: Command): CommandResult {
   }
   const site = siteOf(s, c.siteId);
   if (!site) return no('האתר לא נמצא');
-  if (t.job !== 'idle') return no('המשאית עסוקה');
+  if (!takesOrder(t)) return no('המשאית עסוקה');
+  const go = (to: string) => { if (t.job === 'idle') return startRoute(s, t, to); retarget(s, t, to); return true; }; // on the road: turn toward the new target
   if (c.type === 'collect') {
     if (!site.closed) return no('האירוע עוד לא נגמר: אוספים תאים אחרי הסגירה');
     if (cabinsAt(s, site.def.id).length === 0) return no('אין באתר תאים לאיסוף');
     t.targetSiteId = site.def.id; t.job = 'collecting';
-    if (!startRoute(s, t, spotOf(s, site).nodeId)) { t.job = 'idle'; t.targetSiteId = null; return no('אין דרך לאתר'); }
+    if (!go(spotOf(s, site).nodeId)) { t.job = 'idle'; t.targetSiteId = null; return no('אין דרך לאתר'); }
     if (t.path.length === 1) arrive(s, t);
     return { ok: true };
   }
@@ -386,8 +389,9 @@ export function command(s: GameState, c: Command): CommandResult {
   if (c.type === 'service') {
     if (!site.open) return no('האתר עדיין לא נפתח');
     if (cabinsAt(s, site.def.id).length === 0) return no('אין באתר תאים לשאיבה, קודם צריך לספק תאים');
+    if (t.tankCap - t.tank <= EPS) return no('המיכל מלא: קודם מרוקנים');
     t.targetSiteId = site.def.id; t.job = 'toSite';
-    if (!startRoute(s, t, spotOf(s, site).nodeId)) { t.job = 'idle'; t.targetSiteId = null; return no('אין דרך לאתר'); }
+    if (!go(spotOf(s, site).nodeId)) { t.job = 'idle'; t.targetSiteId = null; return no('אין דרך לאתר'); }
     if (t.path.length === 1) t.job = 'pumping';
     return { ok: true };
   }

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 // DOM Hebrew RTL UI over the canvas. Reads GameState, calls handlers only (no sim logic, no canvas).
-import { LEVELS, ECON, dayResult } from '../sim/index.ts';
+import { LEVELS, ECON, dayResult, takesOrder } from '../sim/index.ts';
 import type { GameState, UiApi, UiHandlers, Selection, LevelDef, Save, DayResult, UpgradeDef, Truck, TruckJob, Cabin } from '../sim/types.ts';
 
 const inDepot = (c: Cabin) => c.siteId === null && c.slot === -1;
@@ -83,7 +83,7 @@ export function createUi(): UiApi & UiExtra {
     return Math.max(0, Math.min(ECON.cabinCarry, s.cabins.filter(clean).length, spot.slots.length - s.cabins.filter((c) => c.siteId === siteId).length));
   };
   const deliverCount = (s: GameState, siteId: string) => { const mx = deliverable(s, siteId); return mx < 1 ? 0 : deliverN ? Math.min(deliverN, mx) : Math.min(guideQty(siteId) || mx, mx); };
-  const idleTruck = (s: GameState): Truck | undefined => s.trucks.find((t) => t.job === 'idle') ?? s.trucks[0];
+  const idleTruck = (s: GameState): Truck | undefined => s.trucks.find((t) => t.job === 'idle') ?? s.trucks.find(takesOrder) ?? s.trucks[0];
 
   function mount(r: HTMLElement, handlers: UiHandlers) {
     root = r; h = handlers; root.textContent = '';
