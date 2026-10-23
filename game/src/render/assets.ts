@@ -150,8 +150,8 @@ export function personArt(kind: 'worker' | 'guest', i: number): Container {
 
 // ---- photoreal iso sprites (assets/real/*.png). Missing file -> null, caller falls back. ----
 export type RealKey = 'bg' | 'truck-dl' | 'truck-dr' | 'truck-ul' | 'truck-ur' | 'cabin' | 'worker' | 'guest'
-  | 'prop-wedding' | 'prop-depot' | 'bg-beach' | 'prop-beach' | 'bg-capital' | 'prop-capital' | 'bg-shows' | 'bg-industry' | 'bg-valley';
-const REAL: RealKey[] = ['bg', 'truck-dl', 'truck-dr', 'truck-ul', 'truck-ur', 'cabin', 'worker', 'guest', 'prop-wedding', 'prop-depot', 'bg-beach', 'prop-beach', 'bg-capital', 'prop-capital', 'bg-shows', 'bg-industry', 'bg-valley'];
+  | 'prop-wedding' | 'prop-depot' | 'bg-beach' | 'prop-beach' | 'bg-capital' | 'prop-capital' | 'bg-shows' | 'bg-industry' | 'bg-valley' | 'bg-desert';
+const REAL: RealKey[] = ['bg', 'truck-dl', 'truck-dr', 'truck-ul', 'truck-ur', 'cabin', 'worker', 'guest', 'prop-wedding', 'prop-depot', 'bg-beach', 'prop-beach', 'bg-capital', 'prop-capital', 'bg-shows', 'bg-industry', 'bg-valley', 'bg-desert'];
 const real = new Map<RealKey, Texture>();
 
 export async function loadReal(): Promise<void> {
