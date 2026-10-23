@@ -90,7 +90,9 @@ export function createUi(): UiApi & UiExtra {
     if (a === 'close') return select(null, last);
     if (a === 'minus') { deliverN = Math.max(1, deliverN - 1); return refreshSheet(last); }
     if (a === 'plus') { deliverN = Math.min(8, deliverN + 1); return refreshSheet(last); }
-    const t = idleTruck(last);
+    // deliver loads only at the depot: prefer an idle truck parked there (another may be idle at a dump)
+    const depot = last.map.depotNodeId;
+    const t = (a === 'deliver' && last.trucks.find((x) => x.job === 'idle' && x.path[x.path.length - 1] === depot)) || idleTruck(last);
     if (!t) return say('אין משאבה פנויה');
     if (a === 'service' && sel.kind === 'site') run({ type: 'service', truckId: t.id, siteId: sel.id });
     else if (a === 'deliver' && sel.kind === 'site') run({ type: 'deliver', truckId: t.id, siteId: sel.id, count: deliverN });
