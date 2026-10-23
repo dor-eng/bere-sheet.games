@@ -16,15 +16,18 @@ const COIN = '<svg class="coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1
 const DROP = '<svg class="coin" viewBox="0 0 24 24"><path d="M12 2C9 7 5 10.5 5 15a7 7 0 0014 0c0-4.500-4-8-7-13z" fill="#29a3dd" stroke="#1E2A3A" stroke-width="2.2" stroke-linejoin="round"/></svg>';
 const JOB: Record<TruckJob, [string, string]> = {
   idle: ['חונה', 's-idle'], toSite: ['בדרך', 's-go'], delivering: ['בדרך', 's-go'], toDepot: ['בדרך', 's-go'],
-  pumping: ['שואב', 's-pump'], dumping: ['מרוקן', 's-dump'],
+  pumping: ['שואב', 's-pump'], dumping: ['מרוקן', 's-dump'], collecting: ['בדרך', 's-go'],
 };
 /** What the truck is doing, in words (destination named). */
 function truckSay(t: Truck, s: GameState): string {
   const site = t.targetSiteId ? s.sites.find((x) => x.def.id === t.targetSiteId) : undefined, nm = site ? shortName(site.def.name) : '';
   const home = t.path[t.path.length - 1] === s.map.depotNodeId; // route endpoint, not the job name
+  const dirtyAboard = t.carrying && s.cabins.some((c) => c.slot === -100 - s.trucks.indexOf(t) && c.washT > 0); // a finished client's cabins
+  if (t.job === 'delivering' && dirtyAboard) return `מחזירה ${t.carrying} ${t.carrying === 1 ? 'תא' : 'תאים'} לשטיפה`;
   if (t.job !== 'idle' && t.job !== 'pumping' && t.job !== 'dumping' && !t.carrying && home && t.path.length > 1) return 'חוזרת למחסן';
   switch (t.job) {
     case 'toSite': return nm ? `בדרך ל${nm}` : 'בדרך לאתר';
+    case 'collecting': return nm ? `אוספת תאים מ${nm}` : 'אוספת תאים';
     case 'delivering': return t.carrying ? `מביאה ${t.carrying} ${t.carrying === 1 ? 'תא' : 'תאים'}${nm ? ` ל${nm}` : ''}` : (nm ? `בדרך ל${nm}` : 'בדרך');
     case 'pumping': return nm ? `שואבת ב${nm}` : 'שואבת';
     case 'toDepot': return home ? 'חוזרת למחסן' : 'נוסעת לרוקן את המיכל';
@@ -72,7 +75,7 @@ export function createUi(): UiApi & UiExtra {
   let book: { s: GameState; over: Set<string>; noCab: Map<string, number>; t: number; minCoins: number } | null = null;
 
   const say = (msg: string) => { toast.textContent = msg; toast.classList.add('on'); clearTimeout(toastT); toastT = window.setTimeout(() => toast.classList.remove('on'), 2200); };
-  const run = (c: Parameters<UiHandlers['command']>[0], okMsg?: string) => { const r = h.command(c); if (r.ok) noteCmd(c); if (!r.ok) say(r.reason ?? 'לא הצלחנו, נסו שוב'); else if (okMsg) say(okMsg); else if (c.type === 'recall') say('המשאבה חוזרת הביתה'); else say(c.type === 'service' ? 'המשאבה בדרך!' : 'התאים בדרך!'); return r; };
+  const run = (c: Parameters<UiHandlers['command']>[0], okMsg?: string) => { const r = h.command(c); if (r.ok) noteCmd(c); if (!r.ok) say(r.reason ?? 'לא הצלחנו, נסו שוב'); else if (okMsg) say(okMsg); else if (c.type === 'recall') say('המשאית חוזרת למחסן'); else say(c.type === 'service' ? 'המשאית יוצאת לשאוב!' : c.type === 'collect' ? 'המשאית יוצאת לאסוף את התאים' : 'התאים בדרך!'); return r; };
   /** How many cabins a deliver command would really bring: min(truck carry, clean stock, free slots) - same as sim command(). */
   const deliverable = (s: GameState, siteId: string) => {
     const st = s.sites.find((x) => x.def.id === siteId), spot = st && s.map.spots.find((p) => p.id === st.def.spotId);
@@ -128,8 +131,9 @@ export function createUi(): UiApi & UiExtra {
     // deliver loads only at the depot: prefer an idle truck parked there (another may be idle at a dump)
     const depot = last.map.depotNodeId;
     const t = (a === 'deliver' && last.trucks.find((x) => x.job === 'idle' && x.path[x.path.length - 1] === depot)) || idleTruck(last);
-    if (!t) return say('אין משאבה פנויה');
+    if (!t) return say('אין משאית פנויה');
     if (a === 'service' && sel.kind === 'site') run({ type: 'service', truckId: t.id, siteId: sel.id });
+    else if (a === 'collect' && sel.kind === 'site') run({ type: 'collect', truckId: t.id, siteId: sel.id });
     else if (a === 'deliver' && sel.kind === 'site') {
       const n = deliverCount(last, sel.id), st = last.sites.find((x) => x.def.id === sel!.id);
       run({ type: 'deliver', truckId: t.id, siteId: sel.id, count: n }, `${n} ${n === 1 ? 'תא' : 'תאים'} בדרך ל${shortName(st?.def.name ?? '')}`);
@@ -175,7 +179,8 @@ export function createUi(): UiApi & UiExtra {
         `<div class="ui-sub">${status}${trend ? ` · <span class="trend">${trend}</span>` : ''} · ${pay}${over}</div>` +
         `<div class="ui-cabins">${cabs.map((c) => { const p = pct(c.fill, c.capacity); return `<div class="cab"><div class="gauge ${heat(p)}"><i style="height:${p}%"></i></div>${p}%</div>`; }).join('') || '<div class="ui-sub">אין תאים באתר</div>'}</div>` +
         `<div class="ui-sub">${cabs.length ? `ממוצע ${pct(total, 1)}% · ` : ''}במחסן: ${free} תאים${wash ? ` (${wash} בשטיפה)` : ''}</div>` +
-        (cabs.length ? pumpBtn + delBtn : delBtn + pumpBtn);
+        (st.closed ? (cabs.length ? `<div class="ui-sub">האירוע נגמר: ${cabs.length} ${cabs.length === 1 ? 'תא מחכה' : 'תאים מחכים'} לאיסוף ולשטיפה במחסן</div><div class="row"><button class="btn" data-act="collect">החזר תאים לשטיפה</button></div>` : '')
+          : cabs.length ? pumpBtn + delBtn : delBtn + pumpBtn);
     } else if (sel.kind === 'truck') {
       const t = s.trucks.find((x) => x.id === sel!.id); if (!t) return;
       const p = pct(t.tank, t.tankCap);
@@ -209,7 +214,7 @@ export function createUi(): UiApi & UiExtra {
 
   function update(s: GameState) {
     last = s; track(s);
-    const coins = Math.floor(s.coins);
+    const coins = Math.floor(s.coinsStart + Math.max(0, netOf(s))); // what the bank will hold: fines never touch savings (applyResult)
     if (coins !== lastCoins) { lastCoins = coins; coinsEl.textContent = fmt(coins); }
     clockEl.textContent = clock(s.time, s.level.dayLength);
     progEl.style.width = pct(s.time, s.level.dayLength) + '%';
@@ -221,7 +226,7 @@ export function createUi(): UiApi & UiExtra {
     // trucks chips: what each one is doing, in words; the bar is the tank
     setHtml(chips, s.trucks.map((t) => { const p = pct(t.tank, t.tankCap); return `<button class="ui-chip" data-truck="${t.id}" style="font-family:inherit"><span class="top">🚚 <b>${esc(t.name)}</b><span class="st ${JOB[t.job][1]}">${esc(truckSay(t, s))}</span></span><span class="tank">מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></span></button>`; }).join(''));
     // alerts: sites overflowing / open with no cabins RIGHT NOW (from events, not history), or a cabin nearly full
-    const hot = s.sites.filter((st) => st.open && !st.closed && (book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id) || s.cabins.some((c) => c.siteId === st.def.id && c.fill / (c.capacity || 1) >= 0.85)));
+    const hot = s.sites.filter((st) => st.closed ? s.cabins.some((c) => c.siteId === st.def.id) : st.open && (book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id) || s.cabins.some((c) => c.siteId === st.def.id && c.fill / (c.capacity || 1) >= 0.85)));
     paintAlerts(hot, s);
     guideTick(s);
     // slow lane (4Hz): history + open sheet
@@ -241,7 +246,7 @@ export function createUi(): UiApi & UiExtra {
   }
 
   function paintAlerts(hot: GameState['sites'], s: GameState) {
-    const why = (st: GameState['sites'][number]) => (!s.cabins.some((c) => c.siteId === st.def.id) ? 'בלי תאים!' : book!.over.has(st.def.id) ? 'גולש!' : 'כמעט מלא');
+    const why = (st: GameState['sites'][number]) => (st.closed ? 'תאים לאיסוף' : !s.cabins.some((c) => c.siteId === st.def.id) ? 'בלי תאים!' : book!.over.has(st.def.id) ? 'גולש!' : 'כמעט מלא');
     const chip = (st: GameState['sites'][number]) => `<button class="ui-chip warn" data-site="${st.def.id}" style="font-family:inherit">⚠️ <b>${esc(shortName(st.def.name))}</b> ${why(st)}</button>`;
     const W = root.clientWidth, H = root.clientHeight, m = 36;
     const hudB = hud.getBoundingClientRect().bottom, sheetT = sel ? sheet.getBoundingClientRect().top : H;
@@ -250,7 +255,7 @@ export function createUi(): UiApi & UiExtra {
       const p = view ? view(st.x, st.y) : null;
       const off = !p || p.x < 0 || p.x > W || p.y < 0 || p.y > H;
       const covered = !!p && !off && (p.y < hudB + 4 || p.y > sheetT - 4); // on screen but under the HUD or the sheet
-      const urgent = book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id);
+      const urgent = !st.closed && (book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id));
       if (!view || covered || urgent) asChip.push(chip(st));
       if (p && off) {
         const cx = W / 2, cy = H / 2, dx = p.x - cx, dy = p.y - cy;
@@ -358,9 +363,10 @@ export function createUi(): UiApi & UiExtra {
       `<ul class="rules">` +
       `<li>🎉 <span>בכל יום יש אירועים בעיר: חתונות, הופעות, אתרי בנייה. האורחים משתמשים בתאים והתאים מתמלאים.</span></li>` +
       `<li>🚽 <span>לוחצים על אתר ← <b>הצב תאים</b>: המשאית מביאה תאים מהמחסן.</span></li>` +
-      `<li>🚚 <span>תא מתמלא? לוחצים על האתר ← <b>שלח משאבה</b>: המשאית שואבת ומרוקנת במחסן.</span></li>` +
+      `<li>🚚 <span>תא מתמלא? לוחצים על האתר ← <b>שלח משאבה</b>: המשאית שואבת ומרוקנת את המיכל במחסן או בתחנת ריקון.</span></li>` +
       `<li>⚠️ <span>תא שמתמלא עד הסוף = עומס יתר = קנס. מקדימים את המשאבה.</span></li>` +
       `<li>⏰ <span>גם אתר פתוח <b>בלי תאים</b> מקבל קנס. מציבים תאים <b>לפני</b> שהאירוע נפתח.</span></li>` +
+      `<li>🧽 <span>האירוע נגמר? לוחצים עליו ← <b>החזר תאים לשטיפה</b>: המשאית אוספת אותם למחסן, ורק תא שטוף יוצא שוב.</span></li>` +
       `<li>${COIN} <span>התשלום מגיע כשהאירוע נגמר, ואובד אם היה עומס יתר ארוך. בכסף קונים שדרוגים.</span></li>` +
       `</ul>` +
       `<button class="btn go" data-ok>${paused ? 'חוזרים לשחק' : 'הבנתי, יאללה'}</button>`);

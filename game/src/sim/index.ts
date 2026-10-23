@@ -176,8 +176,7 @@ function closeSite(s: GameState, site: SiteState) {
     site.earned += site.def.fee; addCoins(s, site.def.fee);
     s.events.push({ kind: 'paid', siteId: site.def.id, amount: site.def.fee });
   }
-  // ponytail: cabins are hauled back instantly; a pickup trip is a later mechanic
-  for (const c of cabinsAt(s, site.def.id)) { c.siteId = null; c.slot = STOCK_SLOT; c.fill = 0; c.washT = s.level.washSec ?? ECON.wash.sec; }
+  // cabins stay on the finished site until a truck collects them (command 'collect') and brings them to the depot to wash
 }
 
 /** Wash center: the first `bays` dirty cabins in the depot wash in parallel. */
@@ -239,7 +238,7 @@ function stepSite(s: GameState, site: SiteState, dt: number) {
 }
 
 function stepTruck(s: GameState, t: Truck, dt: number) {
-  if (t.job === 'toSite' || t.job === 'toDepot' || t.job === 'delivering') {
+  if (t.job === 'toSite' || t.job === 'toDepot' || t.job === 'delivering' || t.job === 'collecting') {
     if (move(s, t, dt)) arrive(s, t);
   } else if (t.job === 'pumping') {
     pump(s, t, dt);
@@ -269,6 +268,17 @@ function move(s: GameState, t: Truck, dt: number): boolean {
 function arrive(s: GameState, t: Truck) {
   const atDepot = t.path[t.path.length - 1] === s.map.depotNodeId;
   if (t.job === 'toSite') { t.job = 'pumping'; return; }
+  if (t.job === 'collecting') { // load the finished site's cabins (dirty), drive them home; the wash starts when they reach the depot
+    const site = t.targetSiteId ? siteOf(s, t.targetSiteId) : undefined, mine = boardSlot(s, t);
+    const load = site ? cabinsAt(s, site.def.id).slice(0, ECON.cabinCarry) : [];
+    for (const c of load) { c.siteId = null; c.slot = mine; c.fill = 0; c.washT = s.level.washSec ?? ECON.wash.sec; }
+    t.carrying = load.length;
+    if (site && load.length) s.events.push({ kind: 'collected', siteId: site.def.id, count: load.length });
+    t.job = 'delivering';
+    startRoute(s, t, s.map.depotNodeId);
+    if (t.path.length === 1) arrive(s, t);
+    return;
+  }
   // toDepot ends at the depot or at a satellite dump (map.dumps): a dump empties the tank only, no stock/wash there
   if (t.job === 'toDepot') { if (atDepot) unloadToStock(s, t); t.job = 'dumping'; if (t.tank <= EPS) { t.tank = 0; t.job = 'idle'; t.targetSiteId = null; } return; }
   if (t.job === 'delivering') {
@@ -364,6 +374,14 @@ export function command(s: GameState, c: Command): CommandResult {
   const site = siteOf(s, c.siteId);
   if (!site) return no('האתר לא נמצא');
   if (t.job !== 'idle') return no('המשאית עסוקה');
+  if (c.type === 'collect') {
+    if (!site.closed) return no('האירוע עוד לא נגמר: אוספים תאים אחרי הסגירה');
+    if (cabinsAt(s, site.def.id).length === 0) return no('אין באתר תאים לאיסוף');
+    t.targetSiteId = site.def.id; t.job = 'collecting';
+    if (!startRoute(s, t, spotOf(s, site).nodeId)) { t.job = 'idle'; t.targetSiteId = null; return no('אין דרך לאתר'); }
+    if (t.path.length === 1) arrive(s, t);
+    return { ok: true };
+  }
   if (site.closed) return no('האתר כבר סגור');
   if (c.type === 'service') {
     if (!site.open) return no('האתר עדיין לא נפתח');

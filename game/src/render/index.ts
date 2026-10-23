@@ -50,6 +50,32 @@ const ANCHOR: Record<Dir, [number, number]> = { dr: [0.45, 0.68], ul: [0.47, 0.6
 interface TruckView {
   c: Container; body: Container; views: Partial<Record<Dir, Container>>; gauge: Graphics; topY: number;
   x: number; y: number; a: number; px: number; py: number; dir: Dir; job: string; q: number; spd: number; dustT: number;
+  cargo: Container; cargoKey: string;
+}
+const DIR_A: Record<Dir, number> = { dr: 0, dl: Math.PI / 2, ul: Math.PI, ur: -Math.PI / 2 };
+/** cabins on board ride on a small flatbed trailer hitched behind the tanker (dirty ones = brown tint, like the wash line) */
+function drawCargo(v: TruckView, n: number, dirty: boolean) {
+  const key = n + '|' + v.dir + '|' + dirty;
+  if (key === v.cargoKey) return;
+  v.cargoKey = key;
+  for (const ch of v.cargo.removeChildren()) ch.destroy({ children: true });
+  if (!n) return;
+  const a = DIR_A[v.dir], ca = Math.cos(a), sa = Math.sin(a);
+  const at = (al: number, ac: number) => { const dx = ca * al - sa * ac, dy = sa * al + ca * ac; return { x: dx - dy, y: (dx + dy) / 2 }; }; // world offset -> screen offset
+  const L = 150, hl = 38, hw = 20, pts = (y: number) => [at(-L - hl, -hw), at(-L + hl, -hw), at(-L + hl, hw), at(-L - hl, hw)].flatMap((p) => [p.x, p.y + y]);
+  const g = new Graphics();
+  const h0 = at(-L + hl, 0), h1 = at(-95, 0);
+  g.moveTo(h0.x, h0.y + 6).lineTo(h1.x, h1.y + 6).stroke({ width: 5, color: INK }); // hitch bar
+  for (const [al, ac] of [[-L - 18, -hw], [-L - 18, hw], [-L + 18, -hw], [-L + 18, hw]]) { const w = at(al, ac); g.ellipse(w.x, w.y + 9, 7, 5).fill({ color: 0x1b2230 }); }
+  g.poly(pts(7)).fill({ color: 0x14263c }).poly(pts(0)).fill({ color: 0x24507e }).stroke({ width: 3, color: INK, join: 'round' });
+  v.cargo.addChild(g);
+  const spots = (n === 1 ? [0] : [-17, 17]).map((al) => at(-L + al, 0)).sort((p, q) => p.y - q.y);
+  for (const p of spots.slice(0, n)) {
+    const cab = realSprite('cabin', 0.5, 0.97, { h: CABIN_H * 0.9 }) ?? art('cabin', 0.7);
+    cab.position.set(p.x, p.y + 2); if (dirty) cab.tint = 0xa08868;
+    v.cargo.addChild(cab);
+  }
+  v.cargo.zIndex = v.dir === 'dl' || v.dir === 'dr' ? -1 : 1; // trailer is up-screen (behind the cab) when driving down-screen
 }
 /** world heading -> screen diagonal: +x DR, -x UL, +y DL, -y UR */
 const dirOf = (a: number): Dir => { const c = Math.cos(a), s = Math.sin(a); return Math.abs(c) >= Math.abs(s) ? (c > 0 ? 'dr' : 'ul') : (s > 0 ? 'dl' : 'ur'); };
@@ -88,7 +114,7 @@ const statColor = (r: number) => (r < 0.6 ? 0x7ee8b0 : r < 0.85 ? 0xffc94d : 0xf
 function drawLabel(L: SiteLabel, s: GameState, st: SiteState, overflow: boolean) {
   const def = st.def, cabs = cabinsOf(s, def.id).length;
   let line: string, color = 0xffffff;
-  if (st.closed) line = 'הסתיים';
+  if (st.closed) { line = cabs ? `הסתיים · ${cabs} לאיסוף` : 'הסתיים'; if (cabs) color = 0xffe7a3; }
   else if (!st.open) { line = 'נפתח ב-' + clockText(def.openAt, s.level.dayLength); color = 0xffe7a3; }
   else if (!cabs) { line = 'אין תאים!'; color = 0xff6b6b; }
   else { const r = avgFill(s, def.id); line = 'מלא ' + Math.round(r * 100) + '%'; color = statColor(r); }
@@ -167,7 +193,8 @@ export function createRender(): RenderApi & RenderExtra {
     for (const p of sv.people) {
       p.t -= dt;
       if (p.st === 'idle' && p.t <= 0) {
-        if (mine.length && open && Math.random() < 0.6) { const cb2 = mine[(Math.random() * mine.length) | 0]; const sp = slotPos(sv.spot, cb2.slot); p.tx = sp.x; p.ty = sp.y + 6; p.st = 'toCabin'; }
+        const room = mine.filter((c) => c.fill < c.capacity * 0.999); // nobody walks into a full cabin: they wait nearby
+        if (room.length && open && Math.random() < 0.6) { const cb2 = room[(Math.random() * room.length) | 0]; const sp = slotPos(sv.spot, cb2.slot); p.tx = sp.x; p.ty = sp.y + 6; p.st = 'toCabin'; }
         else { p.tx = p.hx + (Math.random() - 0.5) * 50; p.ty = p.hy + (Math.random() - 0.5) * 24; p.st = 'back'; } // short stroll near home
       }
       if (p.st === 'toCabin' || p.st === 'back') {
@@ -238,12 +265,14 @@ export function createRender(): RenderApi & RenderExtra {
     }
     if (!Object.keys(views).length) body.addChild(art('truck', 0.85)); // placeholder, no sprites
     const gauge = new Graphics(); gauge.position.set(0, topY - 18);
-    c.addChild(shadow(116, 52), body, gauge); actors.addChild(c);
+    const cargo = new Container(), sh = shadow(116, 52);
+    sh.zIndex = -2; gauge.zIndex = 2; c.sortableChildren = true;
+    c.addChild(sh, cargo, body, gauge); actors.addChild(c);
     const p = iso(t.x, t.y);
-    return { c, body, views, gauge, topY, x: t.x, y: t.y, a: t.angle, px: p.x, py: p.y, dir: dirOf(t.angle), job: t.job, q: -1, spd: 0, dustT: 0 };
+    return { c, body, views, gauge, topY, x: t.x, y: t.y, a: t.angle, px: p.x, py: p.y, dir: dirOf(t.angle), job: t.job, q: -1, spd: 0, dustT: 0, cargo, cargoKey: '' };
   }
 
-  function updateTruck(t: Truck, dt: number) {
+  function updateTruck(t: Truck, dt: number, s: GameState) {
     let v = trucks.get(t.id);
     if (!v) { v = makeTruck(t); trucks.set(t.id, v); }
     const dist = Math.hypot(t.x - v.x, t.y - v.y);
@@ -268,6 +297,8 @@ export function createRender(): RenderApi & RenderExtra {
     if (driving) { v.dustT -= dt; if (v.dustT <= 0) { v.dustT = 0.22; fx.dust(v.px, v.py, sa, 1, 0.55, 48); } }
     v.c.position.set(v.px, v.py);
     v.c.zIndex = v.py + 4;
+    const mine = -100 - s.trucks.indexOf(t); // sim encoding: on board of truck i = slot -100 - i
+    drawCargo(v, t.carrying, s.cabins.some((c) => c.siteId === null && c.slot === mine && c.washT > 0));
     const q = Math.round((t.tank / Math.max(1, t.tankCap)) * 40);
     if (q !== v.q) { v.q = q; drawTankGauge(v.gauge, q / 40); }
   }
@@ -399,7 +430,7 @@ export function createRender(): RenderApi & RenderExtra {
         if (full) { const k = 0.5 + 0.5 * Math.sin(clock * 9); v.ring.alpha = 0.45 + 0.55 * k; v.ring.scale.set(1 + 0.15 * k); }
       }
       for (const [id, v] of cabins) if (!seen.has(id)) { v.c.destroy({ children: true }); cabins.delete(id); }
-      for (const t of s.trucks) updateTruck(t, dt);
+      for (const t of s.trucks) updateTruck(t, dt, s);
       drawSelection();
       cam.tick(dt);
       fx.tick(dt);

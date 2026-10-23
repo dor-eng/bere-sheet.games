@@ -43,7 +43,7 @@ export interface UpgradeDef { id: 'pump' | 'tank' | 'cabin' | 'lights' | 'engine
 export interface Save { coins: number; level: number; stars: Record<number, number>; upgrades: { pump: number; tank: number; cabin: number; lights: number; engine: number; fleet: number } }
 
 // ---------- live state (sim owns + mutates; render/ui read only) ----------
-export type TruckJob = 'idle' | 'toSite' | 'pumping' | 'toDepot' | 'dumping' | 'delivering';
+export type TruckJob = 'idle' | 'toSite' | 'pumping' | 'toDepot' | 'dumping' | 'delivering' | 'collecting'; // collecting = driving to a finished site to load its cabins
 export interface Truck {
   id: string; name: string; job: TruckJob;
   path: string[]; // node ids of current route, path[0] = from
@@ -52,12 +52,13 @@ export interface Truck {
   tank: number; tankCap: number; pumpRate: number; speed: number; // liters, L/s, px/s
   targetSiteId: string | null; carrying: number; // cabins on board
 }
-export interface Cabin { id: string; siteId: string | null; slot: number; fill: number; capacity: number; washT: number } // siteId null = in depot stock; washT > 0 = dirty, seconds of washing left
+export interface Cabin { id: string; siteId: string | null; slot: number; fill: number; capacity: number; washT: number } // siteId null = in depot stock; washT > 0 = dirty, seconds of washing left; cabins of a closed site stay there until a truck collects them
 export interface SiteState { def: SiteDef; open: boolean; closed: boolean; overflowSec: number; earned: number; x: number; y: number }
 export type GameEvent =
   | { kind: 'siteOpen' | 'siteClose' | 'overflowStart' | 'overflowEnd'; siteId: string }
   | { kind: 'cabinEmptied'; siteId: string; cabinId: string; tip: number }
   | { kind: 'delivered'; siteId: string; count: number }
+  | { kind: 'collected'; siteId: string; count: number }
   | { kind: 'paid'; siteId: string; amount: number }
   | { kind: 'fine'; siteId: string; amount: number }
   | { kind: 'washed'; cabinId: string }
@@ -72,6 +73,7 @@ export interface GameState {
 export type Command =
   | { type: 'service'; truckId: string; siteId: string } // drive, empty cabins until tank full / all empty, return, dump
   | { type: 'deliver'; truckId: string; siteId: string; count: number } // load cabins at depot, drive, place in free slots, return
+  | { type: 'collect'; truckId: string; siteId: string } // client finished: drive to the closed site, load its cabins, bring them to the depot to wash
   | { type: 'recall'; truckId: string }; // abort, drive back to depot
 export interface CommandResult { ok: boolean; reason?: string } // reason = Hebrew, shown to the player
 export interface DayResult { levelId: number; stars: 0 | 1 | 2 | 3; earned: number; fines: number; overflowSec: number; coinTarget: number }

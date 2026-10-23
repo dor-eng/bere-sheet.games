@@ -47,7 +47,9 @@ function botAct(s: GameState) {
       .sort((a, b) => key(a) - key(b) || a.x.def.openAt - b.x.def.openAt)[0];
     if (cand && command(s, { type: 'deliver', truckId: t.id, siteId: cand.x.def.id, count: cand.x.def.type === 'wedding' ? 2 : 1 }).ok) return;
   }
-  serve(fullest(0.6));
+  if (serve(fullest(0.6))) return;
+  const done = s.sites.find((x) => x.closed && s.cabins.some((c) => c.siteId === x.def.id)); // nothing urgent: bring a finished client's cabins home to wash
+  if (done) command(s, { type: 'collect', truckId: t.id, siteId: done.def.id });
 }
 function playBot(level: LevelDef, save: Save, m: CityMap = map) {
   const s = createDay(level, m, save);
@@ -179,7 +181,7 @@ test('rejections are Hebrew, truck pose updates, recall works', () => {
   assert.ok(Math.hypot(t.x - n.x, t.y - n.y) < 1e-6);
 });
 
-test('site close: fee paid when no overflow, cabins return to stock', () => {
+test('site close: fee paid when no overflow, cabins stay on the site until collected', () => {
   const s = createDay(L1, map, newSave());
   s.cabins.slice(0, 2).forEach((c, i) => { c.siteId = 's1'; c.slot = i; });
   const open = s.sites[0];
@@ -187,8 +189,9 @@ test('site close: fee paid when no overflow, cabins return to stock', () => {
   runUntil(s, () => open.closed, 260);
   assert.ok(open.closed);
   assert.equal(open.earned, open.def.fee);
-  assert.equal(s.cabins.filter((c) => c.siteId === null && c.slot === -1).length, 3);
   assert.equal(open.overflowSec, 0);
+  assert.equal(s.cabins.filter((c) => c.siteId === 's1').length, 2); // no teleport home
+  assert.equal(s.cabins.filter((c) => c.siteId === null && c.slot === -1).length, 1);
 });
 
 test('determinism: same commands => identical state', () => {
@@ -242,16 +245,18 @@ test('L2/L3 play: bot completes and levels are tuned reachable', () => {
 
 // ---------- wash center (step F) ----------
 const ECONW = { sec: 25, bays: 1 }; // mirrors economy.json wash
+/** 2 cabins on the short job s3 (closes at 110), the rest on s1: depot is empty. After the close t1 collects s3 and brings them home. */
 function washDay() {
   const s = createDay(LEVELS[1], map, { coins: 0, level: 2, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 1 } });
-  // 2 cabins on the short job s3 (closes at 110), the rest on s1: depot is empty
   s.cabins.forEach((c, i) => { c.siteId = i < 2 ? 's3' : 's1'; c.slot = i < 2 ? i : i - 2; });
+  run(s, 110.5);
+  assert.equal(command(s, { type: 'collect', truckId: 't1', siteId: 's3' }).ok, true);
+  runUntil(s, () => s.trucks[0].job === 'idle', 200);
   return s;
 }
 
 test('wash: cabins from a closed site come back dirty and cannot be delivered', () => {
   const s = washDay();
-  run(s, 110.5);
   const back = s.cabins.filter((c) => c.siteId === null);
   assert.equal(back.length, 2);
   assert.ok(back.every((c) => c.washT > 0));
@@ -261,7 +266,7 @@ test('wash: cabins from a closed site come back dirty and cannot be delivered', 
 
 test('wash: one bay washes one cabin at a time, then it can be delivered', () => {
   const s = washDay();
-  run(s, 110 + ECONW.sec + 0.5);
+  run(s, ECONW.sec + 0.5);
   assert.deepEqual(s.cabins.filter((c) => c.siteId === null).map((c) => c.washT === 0), [true, false]);
   assert.equal(command(s, { type: 'deliver', truckId: 't1', siteId: 's2', count: 2 }).ok, true);
   assert.equal(s.trucks[0].carrying, 1); // only the clean one is loaded
@@ -270,7 +275,7 @@ test('wash: one bay washes one cabin at a time, then it can be delivered', () =>
 test('wash: washed event fires per cabin; both clean after two cycles', () => {
   const s = washDay();
   let washed = 0;
-  for (let i = 0; i < Math.round((110 + 2 * ECONW.sec + 1) / DT) && !s.over; i++) { step(s, DT); washed += s.events.filter((e) => e.kind === 'washed').length; }
+  for (let i = 0; i < Math.round((2 * ECONW.sec + 1) / DT) && !s.over; i++) { step(s, DT); washed += s.events.filter((e) => e.kind === 'washed').length; }
   assert.equal(washed, 2);
   assert.ok(s.cabins.filter((c) => c.siteId === null).every((c) => c.washT === 0));
 });
@@ -602,6 +607,8 @@ test('water scarcity: cabins back from a closed site wash for level washSec; no 
     const free = s.cabins.find((c) => c.siteId === null)!;
     if (!s.cabins.some((c) => c.siteId === site)) { free.siteId = site; free.slot = 0; }
     while (s.time < 2.2) step(s, DT);
+    assert.equal(command(s, { type: 'collect', truckId: 't1', siteId: site }).ok, true);
+    while (!s.trucks[0].carrying && s.time < 300) step(s, DT); // loaded = dirty, the wash clock starts at the depot
     return Math.max(...s.cabins.map((c) => c.washT));
   };
   const slow = dirtyMax(lvl), normal = dirtyMax({ ...lvl, washSec: undefined });
@@ -695,4 +702,30 @@ test('render: new day prunes renderer sites the state no longer has, keeps share
   assert.deepEqual(staleSiteIds(want, b), []);
   const f = createDay(L1, map, newSave()); // fresh day: nothing open, no cabins -> only the "opening soon" rule can pick a site
   assert.equal(needsActionId(f), null);
+});
+
+// ---------- pickup after the client ends (LOGIC-FIX 2026-10-23) ----------
+test('collect: refused while the event runs and on an empty site; after close a truck drives there, loads <=2 dirty cabins, washes them at the depot', () => {
+  const s = createDay(LEVELS[1], map, newSave()); // s3 closes at 110 of 220
+  s.cabins.forEach((c, i) => { c.siteId = 's3'; c.slot = i; });
+  assert.equal(command(s, { type: 'collect', truckId: 't1', siteId: 's3' }).ok, false); // event not over: negative control
+  const site = s.sites.find((x) => x.def.id === 's3')!;
+  runUntil(s, () => site.closed, 400);
+  assert.ok(site.closed && !s.over);
+  assert.equal(command(s, { type: 'collect', truckId: 't1', siteId: 's1' }).ok, false); // still open, nothing there
+  const t = s.trucks[0];
+  assert.equal(command(s, { type: 'collect', truckId: 't1', siteId: 's3' }).ok, true);
+  assert.equal(t.job, 'collecting');
+  assert.equal(s.cabins.filter((c) => c.siteId === 's3').length, 3); // nothing moves before the truck arrives
+  let got = 0;
+  runUntil(s, () => { got += s.events.filter((e) => e.kind === 'collected').length; return t.carrying > 0; }, 200);
+  assert.equal(got, 1);
+  assert.equal(t.carrying, ECON.cabinCarry);
+  const n = s.map.nodes.find((q) => q.id === s.map.spots.find((p) => p.id === site.def.spotId)!.nodeId)!;
+  assert.ok(Math.hypot(t.x - n.x, t.y - n.y) < 1e-6, 'loaded at the site, not from afar');
+  runUntil(s, () => t.job === 'idle', 200);
+  const home = s.cabins.filter((c) => c.siteId === null && c.slot === -1);
+  assert.equal(home.length, 2);
+  assert.ok(home.every((c) => c.washT > 0), 'collected cabins come home dirty');
+  assert.equal(s.cabins.filter((c) => c.siteId === 's3').length, 1); // one left for a second trip
 });
