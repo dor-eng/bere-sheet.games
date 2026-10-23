@@ -475,7 +475,7 @@ export function createUi(): UiApi & UiExtra {
   }
 
   /** Start a day right away (the card's go button, a restart, or the auto-start after a city change). */
-  function begin(level: LevelDef, save: Save) { hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(level.id); guideStart(level, save); }
+  function begin(level: LevelDef, save: Save) { saveNow = save; hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(level.id); guideStart(level, save); }
 
   function showDayStart(level: LevelDef, save: Save) {
     saveNow = save;
@@ -512,7 +512,7 @@ export function createUi(): UiApi & UiExtra {
     const tol = ECON.feeOverflowTolerance, nm = worst.def.name, sec = wForfeit ? Math.max(tol + 1, Math.ceil(worst.overflowSec)) : Math.min(tol, Math.floor(worst.overflowSec)), // 'over 12 s' = forfeit: never show 12 next to a lost fee
     nc = Math.round(book?.s === s ? book.noCab.get(worst.def.id) ?? 0 : 0);
     const noCabMain = nc >= worst.overflowSec * 0.5;
-    const line = (noCabMain ? `האתר ${nm} היה פתוח בלי תאים ${nc} שניות` : `האתר ${nm} היה בעומס יתר ${sec} שניות`) + `: קנס ${fmt(wf)}` + (wForfeit ? ` והתשלום (${fmt(worst.def.fee)}) אבד` : '');
+    const line = (noCabMain ? `האתר ${nm} היה פתוח בלי תאים: ${sec} שניות עומס יתר` : `האתר ${nm} היה בעומס יתר ${sec} שניות`) + `: קנס ${fmt(wf)}` + (wForfeit ? ` והתשלום (${fmt(worst.def.fee)}) אבד` : '');
     const tip = noCabMain ? `הציבו תאים לפני הפתיחה (${clock(worst.def.openAt, s.level.dayLength)}).` : 'שלחו משאבה כשהתא מלא בערך בשני שליש, לפני שהוא מתמלא.';
     return { line, tip };
   }
