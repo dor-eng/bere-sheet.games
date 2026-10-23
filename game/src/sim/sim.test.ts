@@ -11,6 +11,7 @@ import cityDesert from '../data/city-desert.json' with { type: 'json' };
 import cityNight from '../data/city-night.json' with { type: 'json' };
 import type { CityMap, GameState, Save, LevelDef } from './types.ts';
 import { createDay, step, command, dayResult, applyResult, buyUpgrade, newSave, route, pathTime, gateCrowded, LEVELS, UPGRADES, ECON } from './index.ts';
+import { staleSiteIds, needsActionId } from '../render/siteSync.ts';
 
 const map = city1 as unknown as CityMap;
 const DT = 1 / 30;
@@ -681,4 +682,17 @@ test('fleet shop: engine speeds trucks, fleet adds a 2nd truck, old saves keep 1
   assert.ok(bought.ok); assert.equal(bought.save.upgrades.fleet, 1); assert.equal(bought.save.coins, 0);
   assert.equal(buyUpgrade({ ...bought.save, coins: 9999 }, 'fleet').ok, false);
   assert.equal(fleet.fromLevel, 7); assert.equal(engine.fromLevel, 4);
+});
+
+test('render: new day prunes renderer sites the state no longer has, keeps shared ids', () => {
+  const fake = (l: LevelDef) => ({ sites: l.sites.map((def) => ({ def })) }) as GameState; // staleSiteIds only reads sites (levels use different maps)
+  const a = fake(LEVELS[9]), b = fake(LEVELS[11]);
+  const have = a.sites.map((x) => x.def.id), want = new Set(b.sites.map((x) => x.def.id));
+  const stale = staleSiteIds(have, b);
+  assert.deepEqual(stale.sort(), have.filter((id) => !want.has(id)).sort());
+  for (const id of have) assert.equal(stale.includes(id), !want.has(id));
+  assert.ok(stale.length > 0, 'day 10 and 12 differ');
+  assert.deepEqual(staleSiteIds(want, b), []);
+  const f = createDay(L1, map, newSave()); // fresh day: nothing open, no cabins -> only the "opening soon" rule can pick a site
+  assert.equal(needsActionId(f), null);
 });

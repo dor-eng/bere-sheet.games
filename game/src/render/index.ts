@@ -1,13 +1,14 @@
 // PixiJS 8 map renderer, isometric. Reads GameState only. Contract: src/sim/types.ts (RenderApi).
 // Sim is in world px (1000 x 1600); everything drawn goes through iso() into the 2600 x 1733 projected canvas.
-import { Application, Container, Graphics, Sprite } from 'pixi.js';
-import type { CityMap, GameState, RenderApi, Selection, SiteDef, SiteSpot, Truck } from '../sim/types.ts';
+import { Application, Container, Graphics, Text } from 'pixi.js';
+import type { CityMap, GameState, RenderApi, Selection, SiteDef, SiteSpot, SiteState, Truck } from '../sim/types.ts';
 import { art, loadAssets, loadReal, logo, personArt, realSprite, INK } from './assets.ts';
 import { Camera, bindGestures } from './camera.ts';
 import { FxLayer } from './fx.ts';
 import { iso, isoRect, unIso, ISO_W, ISO_H } from './iso.ts';
 import { buildDumps, buildGates, buildPad, buildStatic, GROUND, type Pad } from './scene.ts';
 import { gateCrowded } from '../sim/index.ts';
+import { avgFill, cabinsOf, clockText, fineSoFar, isOverflowing, needsActionId, staleSiteIds } from './siteSync.ts';
 
 const gaugeColor = (r: number) => (r < 0.6 ? 0x3dd68c : r < 0.85 ? 0xffb020 : 0xe5484d);
 const TRUCK_W = 280, CABIN_H = 56, PERSON_H = 36;
@@ -64,7 +65,53 @@ function drawTankGauge(g: Graphics, ratio: number) {
 
 // ---- people ----
 interface Person { c: Container; fig: Container; x: number; y: number; hx: number; hy: number; st: 'idle' | 'toCabin' | 'inside' | 'back'; t: number; tx: number; ty: number; ph: number }
-interface SiteView { def: SiteDef; spot: SiteSpot; pad: Pad; people: Person[]; maxN: number }
+interface SiteLabel { c: Container; plate: Graphics; name: Text; stat: Text; badge: Container; badgeBg: Graphics; badgeTxt: Text; key: string; w: number; h: number; bh: number }
+interface SiteView { def: SiteDef; spot: SiteSpot; pad: Pad; people: Person[]; maxN: number; label: SiteLabel }
+
+// ---- site marker: name plate + status line (+ fine badge above it). Built at LU font units, counter-scaled to a constant css size. ----
+const RLM = '\u200F'; // canvas text is laid out LTR off-DOM: strong-RTL marks keep Hebrew + digits + '!' in reading order
+const LABEL_CSS = 0.55; // label unit -> css px (font 30 => ~16 css px)
+const txt = (size: number, fill: number) => new Text({ text: '', resolution: 2, style: { fontFamily: 'system-ui, Arial, sans-serif', fontWeight: '900', fontSize: size, fill, stroke: { color: INK, width: 5, join: 'round' } } });
+function makeLabel(): SiteLabel {
+  const c = new Container();
+  const plate = new Graphics(), name = txt(32, 0xffffff), stat = txt(28, 0xffffff);
+  name.anchor.set(0.5, 0); stat.anchor.set(0.5, 0);
+  const badge = new Container(), badgeBg = new Graphics(), badgeTxt = txt(30, 0xffffff);
+  const coin = art('icon-coin'); coin.scale.set(1.1);
+  badgeTxt.anchor.set(0, 0.5);
+  badge.addChild(badgeBg, coin, badgeTxt); badge.visible = false;
+  c.addChild(plate, name, stat, badge);
+  return { c, plate, name, stat, badge, badgeBg, badgeTxt, key: '', w: 0, h: 0, bh: 0 };
+}
+const statColor = (r: number) => (r < 0.6 ? 0x7ee8b0 : r < 0.85 ? 0xffc94d : 0xff6b6b);
+/** refresh text/plate/badge (only when something changed); returns nothing, positions are set by the caller */
+function drawLabel(L: SiteLabel, s: GameState, st: SiteState, overflow: boolean) {
+  const def = st.def, cabs = cabinsOf(s, def.id).length;
+  let line: string, color = 0xffffff;
+  if (st.closed) line = 'הסתיים';
+  else if (!st.open) { line = 'נפתח ב-' + clockText(def.openAt, s.level.dayLength); color = 0xffe7a3; }
+  else if (!cabs) { line = 'אין תאים!'; color = 0xff6b6b; }
+  else { const r = avgFill(s, def.id); line = 'מלא ' + Math.round(r * 100) + '%'; color = statColor(r); }
+  const fine = overflow ? fineSoFar(st) : 0;
+  const key = def.name + '|' + line + '|' + fine;
+  if (key === L.key) return;
+  L.key = key;
+  L.name.text = RLM + def.name + RLM; L.stat.text = RLM + line + RLM; L.stat.style.fill = color;
+  const w = Math.max(L.name.width, L.stat.width) + 28, h = 8 + L.name.height + L.stat.height * 0.95 + 8;
+  L.w = w; L.h = h;
+  L.name.position.set(0, -h + 8); L.stat.position.set(0, -h + 8 + L.name.height - 2);
+  L.plate.clear().roundRect(-w / 2, -h, w, h, 18).fill({ color: INK, alpha: 0.9 }).stroke({ width: 4, color: fine > 0 ? 0xe5484d : 0xffffff, alpha: 0.95 });
+  L.bh = 0;
+  L.badge.visible = fine > 0;
+  if (fine > 0) {
+    L.badgeTxt.text = '-' + fine; L.badgeTxt.position.set(8, 0);
+    const bw = 36 + 8 + L.badgeTxt.width + 18, bh = 46;
+    L.badgeBg.clear().roundRect(-bw / 2, -bh / 2, bw, bh, 23).fill({ color: 0xe5484d }).stroke({ width: 4, color: 0xffffff });
+    L.badge.children[1].position.set(-bw / 2 + 10, 0);
+    L.badgeTxt.x = -bw / 2 + 10 + 30;
+    L.badge.position.set(0, -h - bh / 2 - 6); L.bh = bh + 6;
+  }
+}
 
 function usageRate(def: SiteDef, time: number): number {
   const u = def.usage; if (!u.length) return 0;
@@ -81,7 +128,8 @@ export interface RenderExtra {
 
 export function createRender(): RenderApi & RenderExtra {
   let app: Application, cam: Camera, map: CityMap;
-  let world: Container, actors: Container, padLayer: Container, gates: Graphics;
+  let world: Container, actors: Container, padLayer: Container, gates: Graphics, labels: Container;
+  const ring = new Graphics(), arrow = new Graphics();
   const fx = new FxLayer();
   const sel = new Graphics();
   let selected: Selection = null;
@@ -143,14 +191,24 @@ export function createRender(): RenderApi & RenderExtra {
     }
   }
 
+  function dropSite(id: string) {
+    const sv = sites.get(id); if (!sv) return;
+    for (const p of sv.people) p.c.destroy({ children: true });
+    sv.pad.c.destroy({ children: true }); sv.label.c.destroy({ children: true });
+    sites.delete(id);
+    if (selected?.kind === 'site' && selected.id === id) { selected = null; cb(null); }
+  }
+
   function ensureSite(s: GameState, i: number): SiteView | undefined {
     const st = s.sites[i];
     let sv = sites.get(st.def.id);
-    if (sv) return sv;
+    if (sv && (sv.def.spotId !== st.def.spotId || sv.def.type !== st.def.type)) { dropSite(st.def.id); sv = undefined; } // same id, different site on a new day
+    if (sv) { sv.def = st.def; return sv; }
     const spot = map.spots.find((p) => p.id === st.def.spotId); if (!spot) return undefined;
     const pad = buildPad(spot, st.def.type, map.nodes.find((n) => n.id === spot.nodeId));
     padLayer.addChild(pad.c);
-    sv = { def: st.def, spot, pad, people: [], maxN: st.def.type === 'construction' ? 6 : 10 };
+    const label = makeLabel(); labels.addChild(label.c);
+    sv = { def: st.def, spot, pad, people: [], maxN: st.def.type === 'construction' ? 6 : 10, label };
     sites.set(st.def.id, sv);
     return sv;
   }
@@ -221,12 +279,26 @@ export function createRender(): RenderApi & RenderExtra {
     let best: Selection = null, bd = Infinity;
     for (const [id, v] of trucks) { const d = Math.hypot(v.px - P.x, v.py - 28 - P.y); if (d < fingerR + 20 && d < bd) { bd = d; best = { kind: 'truck', id }; } }
     if (best) return best;
+    for (const [id, sv] of sites) { // site marker: bottom-centre anchored plate (+ fine badge), counter-scaled
+      const L = sv.label, k = L.c.scale.x, pr = 8 / cam.scale;
+      if (Math.abs(P.x - L.c.x) < (L.w / 2) * k + pr && P.y < L.c.y + pr && P.y > L.c.y - (L.h + L.bh) * k - pr) return { kind: 'site', id };
+    }
     for (const [id, sv] of sites) {
       const p = sv.pad, pad = Math.max(0, fingerR - 40);
       if (Math.abs(w.x - p.cx) < p.w / 2 + pad && Math.abs(w.y - p.cy) < p.h / 2 + pad) return { kind: 'site', id };
     }
     if (Math.hypot(w.x - map.depot.x, w.y - (map.depot.y - 30)) < Math.max(120, fingerR + 60)) return { kind: 'depot', id: 'depot' };
     return null;
+  }
+
+  const def_isFocus = (sv: SiteView, id: string | null) => id !== null && sv.def.id === id;
+  /** pulsing ring on the lot + bouncing arrow over the marker */
+  function drawFocus(sv: SiteView, over: boolean, lk: number) {
+    const col = over ? 0xe5484d : 0xffc83d, k = 0.5 + 0.5 * Math.sin(clock * 6), p = sv.pad, m = 10 + 10 * k;
+    const pts = isoRect(p.x0 - m, p.y0 - m, p.x1 + m, p.y1 + m);
+    ring.poly(pts).stroke({ width: 12, color: INK, join: 'round', alpha: 0.6 + 0.4 * k }).poly(pts).stroke({ width: 7, color: col, join: 'round', alpha: 0.6 + 0.4 * k });
+    const L = sv.label, top = L.c.y - (L.h + L.bh) * lk - 10 * lk - Math.abs(Math.sin(clock * 5)) * 18 * lk, x = L.c.x, u = 14 * lk;
+    arrow.poly([x - u * 1.3, top - u * 2, x + u * 1.3, top - u * 2, x, top]).fill({ color: col }).stroke({ width: 3 * lk, color: INK, join: 'round' });
   }
 
   function drawSelection() {
@@ -259,7 +331,8 @@ export function createRender(): RenderApi & RenderExtra {
       const st = buildStatic(map);
       for (const t of st.things) actors.addChild(t);
       gates = buildGates(map); gates.visible = false; // crowd-flow gate barriers: only while a gate window is open
-      world.addChild(st.ground, buildDumps(map), gates, padLayer, sel, actors, fx.layer); // dump stations: none on maps without map.dumps
+      labels = new Container();
+      world.addChild(st.ground, buildDumps(map), gates, padLayer, sel, ring, actors, fx.layer, labels, arrow); // dump stations: none on maps without map.dumps
       app.stage.addChild(world);
       cam = new Camera(world, ISO_W, ISO_H);
       cam.resize(el.clientWidth || app.screen.width, el.clientHeight || app.screen.height);
@@ -277,11 +350,19 @@ export function createRender(): RenderApi & RenderExtra {
       if (!app || !cam) return;
       clock += dt;
       if (s.time < lastEventTime) lastEventTime = -1; // new day
+      for (const id of staleSiteIds(sites.keys(), s)) dropSite(id); // new day: drop renderer sites the state no longer has
+      const focusId = needsActionId(s), lk = LABEL_CSS / cam.scale;
+      ring.clear(); arrow.clear();
       for (let i = 0; i < s.sites.length; i++) {
         const sv = ensureSite(s, i); if (!sv) continue;
         const st = s.sites[i];
         sv.pad.c.alpha = st.open ? 1 : st.closed ? 0.55 : 0.8;
         stepPeople(sv, s, dt, st.open);
+        const over = isOverflowing(s, st);
+        drawLabel(sv.label, s, st, over);
+        const lp = iso(sv.pad.x0, sv.pad.y0), L = sv.label.c;
+        L.position.set(lp.x, lp.y - 6 / cam.scale); L.scale.set(lk); L.alpha = st.closed ? 0.6 : 1;
+        if (def_isFocus(sv, focusId)) drawFocus(sv, over, lk);
       }
       gates.visible = gateCrowded(s.level.gateWindows, s.time);
       if (s.time !== lastEventTime) { handleEvents(s); lastEventTime = s.time; } // re-called without a sim step => don't replay FX
