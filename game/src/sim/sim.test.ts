@@ -224,7 +224,7 @@ test('economy: applyResult advances + keeps best stars, upgrades cost + cap', ()
   let cur: Save = { ...newSave(), coins: 5000 };
   for (let i = 0; i < 3; i++) { const r = buyUpgrade(cur, 'pump'); assert.ok(r.ok); cur = r.save; }
   assert.equal(cur.upgrades.pump, 3); assert.equal(buyUpgrade(cur, 'pump').ok, false);
-  for (const u of UPGRADES) { assert.equal(u.values.length, 4); assert.equal(u.costs.length, 3); }
+  for (const u of UPGRADES) { assert.equal(u.values.length, u.costs.length + 1); assert.ok(u.costs.length >= 1); }
   assert.equal(LEVELS.length, 24);
   const s3 = createDay(LEVELS[0], map, cur);
   assert.equal(s3.trucks[0].pumpRate, 70);
@@ -645,7 +645,7 @@ test('night shift: truck speed = lights value x base on night levels; day level 
   assert.equal(lights.fromLevel, 22);
 });
 test('night play: bot reaches day end with >=1 star on L22-L24 without lights', () => {
-  const save: Save = { coins: 0, level: 22, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2, lights: 0 } };
+  const save: Save = { coins: 0, level: 22, stars: {}, upgrades: { pump: 2, tank: 2, cabin: 2, lights: 0, engine: 0, fleet: 0 } };
   const got: number[] = [];
   for (const l of LEVELS.filter((x) => x.city === 'city-night')) {
     const s = createDay(l, night, { ...save, level: l.id });
@@ -656,4 +656,29 @@ test('night play: bot reaches day end with >=1 star on L22-L24 without lights', 
     got.push(r.stars);
   }
   assert.ok(got.every((x) => x >= 1), got.join('/'));
+});
+test('fleet shop: engine speeds trucks, fleet adds a 2nd truck, old saves keep 1 slow truck', () => {
+  const L7 = LEVELS.find((l) => l.id === 7)!;
+  const engine = UPGRADES.find((u) => u.id === 'engine')!, fleet = UPGRADES.find((u) => u.id === 'fleet')!;
+  const sv = (e: number, f: number) => ({ coins: 0, level: 7, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 2, lights: 0, engine: e, fleet: f } }) as Save;
+  const old = { coins: 0, level: 7, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 2, lights: 0 } } as unknown as Save;
+  assert.equal(createDay(L7, capital, old).trucks.length, 1);
+  assert.equal(createDay(L7, capital, old).trucks[0].speed, ECON.truck.speed);
+  assert.equal(createDay(L7, capital, sv(2, 0)).trucks[0].speed, ECON.truck.speed * engine.values[2]);
+  const s = createDay(L7, capital, sv(0, 1));
+  assert.deepEqual(s.trucks.map((t) => t.id), ['t1', 't2']);
+  assert.notEqual(s.trucks[0].name, s.trucks[1].name);
+  // both trucks take jobs at the same time on two sites
+  while (s.sites.filter((x) => x.open).length < 2 && !s.over) step(s, DT);
+  const [a, b] = s.sites.filter((x) => x.open);
+  assert.ok(command(s, { type: 'deliver', truckId: 't1', siteId: a.def.id, count: 1 }).ok);
+  assert.ok(command(s, { type: 'deliver', truckId: 't2', siteId: b.def.id, count: 1 }).ok);
+  step(s, DT);
+  assert.ok(s.trucks.every((t) => t.job !== 'idle'), s.trucks.map((t) => t.job).join());
+  while (!s.over) step(s, DT);
+  // buy path: 400 coins, maxes at one extra truck
+  const bought = buyUpgrade({ ...sv(0, 0), coins: fleet.costs[0] }, 'fleet');
+  assert.ok(bought.ok); assert.equal(bought.save.upgrades.fleet, 1); assert.equal(bought.save.coins, 0);
+  assert.equal(buyUpgrade({ ...bought.save, coins: 9999 }, 'fleet').ok, false);
+  assert.equal(fleet.fromLevel, 7); assert.equal(engine.fromLevel, 4);
 });

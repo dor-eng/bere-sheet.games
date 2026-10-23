@@ -15,6 +15,7 @@ import cityNight from './data/city-night.json';
 const KEY = 'bereshit.save.v1';
 let save: Save = JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? newSave();
 save.upgrades.lights ??= 0; // saves from before city 8
+save.upgrades.engine ??= 0; save.upgrades.fleet ??= 0; // saves from before the fleet shop
 const persist = () => localStorage.setItem(KEY, JSON.stringify(save));
 const level = () => LEVELS[Math.min(save.level, LEVELS.length) - 1];
 const mapOf = (id?: string) => ((id === 'city-beach' ? cityBeach : id === 'city-capital' ? cityCapital : id === 'city-shows' ? cityShows : id === 'city-industry' ? cityIndustry : id === 'city-valley' ? cityValley : id === 'city-desert' ? cityDesert : id === 'city-night' ? cityNight : cityReal) as CityMap);

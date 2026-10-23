@@ -20,7 +20,7 @@ const EPS = 1e-6;
 const STOCK_SLOT = -1;
 
 export function newSave(): Save {
-  return { coins: 0, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0, lights: 0 } };
+  return { coins: 0, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0, lights: 0, engine: 0, fleet: 0 } };
 }
 
 // ---------- routing ----------
@@ -132,12 +132,15 @@ export function createDay(level: LevelDef, map: CityMap, save: Save): GameState 
   const tank = Math.min(UPGRADES.find((u) => u.id === 'tank')!.values[save.upgrades.tank], level.maxTank ?? Infinity);
   const cabinCount = UPGRADES.find((u) => u.id === 'cabin')!.values[save.upgrades.cabin];
   const night = level.night ? UPGRADES.find((u) => u.id === 'lights')!.values[save.upgrades.lights ?? 0] : 1; // old saves have no lights
+  const engine = UPGRADES.find((u) => u.id === 'engine')!.values[save.upgrades.engine ?? 0];
+  const fleet = UPGRADES.find((u) => u.id === 'fleet')!.values[save.upgrades.fleet ?? 0];
   const dn = nodeOf(map, map.depotNodeId);
-  const truck: Truck = {
-    id: 't1', name: level.maxTank ? 'המשאית הקטנה' : ECON.truck.name, job: 'idle', path: [map.depotNodeId], seg: 0, segT: 0,
-    x: dn.x, y: dn.y, angle: 0, tank: 0, tankCap: tank, pumpRate: pump, speed: ECON.truck.speed * night,
+  const trucks: Truck[] = [];
+  for (let i = 0; i < fleet; i++) trucks.push({
+    id: `t${i + 1}`, name: (level.maxTank ? 'המשאית הקטנה' : ECON.truck.name) + (i ? ` ${i + 1}` : ''), job: 'idle', path: [map.depotNodeId], seg: 0, segT: 0,
+    x: dn.x, y: dn.y, angle: 0, tank: 0, tankCap: tank, pumpRate: pump, speed: ECON.truck.speed * night * engine,
     targetSiteId: null, carrying: 0,
-  };
+  });
   const cabins: Cabin[] = [];
   for (let i = 0; i < cabinCount; i++) {
     cabins.push({ id: `c${i + 1}`, siteId: null, slot: STOCK_SLOT, fill: 0, capacity: ECON.cabinCapacity, washT: 0 });
@@ -146,7 +149,7 @@ export function createDay(level: LevelDef, map: CityMap, save: Save): GameState 
     const spot = map.spots.find((p) => p.id === def.spotId)!;
     return { def, open: false, closed: false, overflowSec: 0, earned: 0, x: spot.x, y: spot.y };
   });
-  return { level, map, time: 0, over: false, coinsStart: save.coins, coins: save.coins, trucks: [truck], cabins, sites, events: [] };
+  return { level, map, time: 0, over: false, coinsStart: save.coins, coins: save.coins, trucks, cabins, sites, events: [] };
 }
 
 // ---------- usage ----------

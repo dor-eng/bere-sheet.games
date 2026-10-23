@@ -19,7 +19,7 @@ const level: LevelDef = {
   unlock: { kind: 'site', name: 'אתר חדש', desc: 'חתונה גדולה בשער העיר', icon: 'icon-cabin' },
 };
 const level2: LevelDef = { ...level, id: 2, title: 'שוק הכרמל', unlock: { kind: 'vehicle', name: 'משאבה מהירה', desc: 'משאית שנוסעת כפול', icon: 'icon-pump' } };
-const save: Save = { coins: 260, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0, lights: 0 } };
+const save: Save = { coins: 260, level: 1, stars: {}, upgrades: { pump: 0, tank: 0, cabin: 0, lights: 0, engine: 0, fleet: 0 } };
 
 const cabins: Cabin[] = [];
 level.sites.forEach((s, si) => [0.15, 0.55, 0.82, 0.97].slice(0, si ? 3 : 4).forEach((f, i) => cabins.push({ id: `c${si}${i}`, siteId: s.id, slot: i, fill: f * 100, capacity: 100, washT: 0 })));

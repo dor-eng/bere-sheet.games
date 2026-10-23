@@ -37,10 +37,10 @@ export interface LevelDef {
   coinTarget: number; // 3rd star
   unlock: UnlockDef; // shown on this level's end card
 }
-export interface UpgradeDef { id: 'pump' | 'tank' | 'cabin' | 'lights'; name: string; desc: string; costs: number[]; values: number[]; fromLevel?: number } // values[i] = stat at upgrade level i (values[0] = start)
+export interface UpgradeDef { id: 'pump' | 'tank' | 'cabin' | 'lights' | 'engine' | 'fleet'; name: string; desc: string; costs: number[]; values: number[]; fromLevel?: number } // values[i] = stat at upgrade level i (values[0] = start)
 
 // ---------- persistent save (localStorage 'bereshit.save.v1') ----------
-export interface Save { coins: number; level: number; stars: Record<number, number>; upgrades: { pump: number; tank: number; cabin: number; lights: number } }
+export interface Save { coins: number; level: number; stars: Record<number, number>; upgrades: { pump: number; tank: number; cabin: number; lights: number; engine: number; fleet: number } }
 
 // ---------- live state (sim owns + mutates; render/ui read only) ----------
 export type TruckJob = 'idle' | 'toSite' | 'pumping' | 'toDepot' | 'dumping' | 'delivering';
