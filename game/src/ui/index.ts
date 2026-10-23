@@ -43,6 +43,7 @@ export function createUi(): UiApi & UiExtra {
   let coinsEl: HTMLElement, clockEl: HTMLElement, progEl: HTMLElement, speedEl: HTMLElement;
   let sel: Selection = null;
   let last: GameState | null = null;
+  let howtoSeen = false; // ponytail: once per page load, not persisted
   let deliverN = 1, speed: 1 | 2 | 3 = 1, toastT = 0, lastCoins = -1;
   let view: ((x: number, y: number) => { x: number; y: number } | null) | null = null;
   const hist = new Map<string, { t: number; v: number }[]>();
@@ -206,7 +207,24 @@ export function createUi(): UiApi & UiExtra {
   const showCard = (inner: string) => { cardWrap.innerHTML = `<div class="ui-card">${inner}</div>`; cardWrap.classList.remove('ui-hidden'); hud.classList.add('ui-hidden'); chips.classList.add('ui-hidden'); sheet.classList.add('ui-hidden'); arrows.style.display = 'none'; alertChips.style.display = 'none'; sel = null; };
   const hideCard = () => { cardWrap.classList.add('ui-hidden'); cardWrap.textContent = ''; hud.classList.remove('ui-hidden'); chips.classList.remove('ui-hidden'); arrows.style.display = ''; alertChips.style.display = ''; };
 
+  /** How to play: shown before day 1 of a new game and from the day card button. */
+  function showHowTo(then: () => void) {
+    showCard(`<div class="logo"><img src="/play/assets/logo-white.svg" alt="בראשית"></div>` +
+      `<h2>איך משחקים</h2>` +
+      `<div class="ui-sub" style="color:#4a5a6a">אתם מנהלים את משאיות השירותים של בראשית. אין יריב: משחקים נגד השעון.</div>` +
+      `<ul class="rules">` +
+      `<li>🎉 בכל יום יש אירועים בעיר: חתונות, הופעות, אתרי בנייה. האורחים משתמשים בתאים והתאים מתמלאים.</li>` +
+      `<li>🚽 לוחצים על אתר ← <b>הצב תאים</b>: המשאית מביאה תאים מהמחסן.</li>` +
+      `<li>🚚 תא מתמלא? לוחצים על האתר ← <b>שלח משאבה</b>: המשאית שואבת ומרוקנת במחסן.</li>` +
+      `<li>⚠️ תא שמתמלא עד הסוף = עומס יתר = קנס. מקדימים את המשאבה.</li>` +
+      `<li>${COIN} כל אירוע משלם. בסוף היום מקבלים כוכבים, ובכסף קונים משאבה, מיכל ותאים טובים יותר.</li>` +
+      `</ul>` +
+      `<button class="btn go" data-ok>הבנתי, יאללה</button>`);
+    cardWrap.querySelector('[data-ok]')!.addEventListener('click', then);
+  }
+
   function showDayStart(level: LevelDef, save: Save) {
+    if (level.id === 1 && !Object.keys(save.stars).length && !howtoSeen) { howtoSeen = true; return showHowTo(() => showDayStart(level, save)); }
     const len = level.dayLength;
     const sites = level.sites.map((s) => `<div class="site-row"><span>${SITE_ICON[s.type]}</span><span>${esc(s.name)}</span><span class="t">${clock(s.openAt, len)}–${clock(s.closeAt, len)}</span></div>`).join('');
     showCard(`<div class="logo"><img src="/play/assets/logo-white.svg" alt="בראשית"></div>` +
@@ -216,8 +234,9 @@ export function createUi(): UiApi & UiExtra {
       `<h4>המטרה</h4><ul class="rules"><li>${STAR.replace('<svg', '<svg width="26" height="26"')} כוכב: מסיימים את היום ברווח</li>` +
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שני כוכבים: בלי אף עומס יתר</li>` +
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שלושה: גם ${fmt(level.coinTarget)} ${COIN}</li></ul>` +
-      `<button class="btn go" data-go>יוצאים לעבודה</button>`);
+      `<button class="btn go" data-go>יוצאים לעבודה</button><button class="btn alt" data-how style="margin-top:8px">איך משחקים?</button>`);
     cardWrap.querySelector('[data-go]')!.addEventListener('click', () => { hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(); });
+    cardWrap.querySelector('[data-how]')!.addEventListener('click', () => showHowTo(() => showDayStart(level, save)));
   }
 
   function showDayEnd(r: DayResult, save: Save, next: LevelDef | undefined) {
