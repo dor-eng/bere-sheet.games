@@ -370,10 +370,13 @@ export function createUi(): UiApi & UiExtra {
   function showDayStart(level: LevelDef, save: Save) {
     if (level.id === 1 && !Object.keys(save.stars).length && !howtoSeen) { howtoSeen = true; return showHowTo(() => showDayStart(level, save)); }
     const len = level.dayLength;
+    const nu = LEVELS[level.id - 2]?.unlock; // the previous level's unlock describes what this day brings: introduce it on the day it first appears
+    const nuText = (u: NonNullable<typeof nu>) => { const d = u.desc.replace(/^הבא:\s*/, ''); return d.startsWith(u.name + '. ') ? d.slice(u.name.length + 2) : d; }; // the city name is already the title
     const sites = level.sites.map((s) => `<div class="site-row"><span>${SITE_ICON[s.type]}</span><span>${esc(s.name)}</span><span class="t">${clock(s.openAt, len)}–${clock(s.closeAt, len)}</span></div>`).join('');
     showCard(`<div class="logo"><img src="/play/assets/logo-white.svg" alt="בראשית"></div>` +
       `<h2>יום ${level.id}: ${esc(level.title)}</h2>` +
       `<div class="ui-sub" style="color:#4a5a6a;display:flex;justify-content:center;gap:6px;align-items:center">בקופה: <b>${fmt(save.coins)}</b>${COIN}</div>` +
+      (nu ? `<div class="teaser"><div style="font-size:34px">${ICON[nu.kind] ?? '🎁'}</div><div><b>חדש היום: ${esc(nu.name)}</b><span>${esc(nuText(nu))}</span></div></div>` : '') +
       `<h4>האתרים היום</h4><div class="sites">${sites}</div>` +
       `<h4>המטרה</h4><ul class="rules"><li>${STAR.replace('<svg', '<svg width="26" height="26"')} כוכב: מסיימים את היום ברווח (שכר פחות קנסות גדול מאפס)</li>` +
       `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שני כוכבים: גם עומס יתר של עד ${ECON.feeOverflowTolerance} שניות בסך הכל</li>` +
