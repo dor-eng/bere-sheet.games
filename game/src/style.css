@@ -16,9 +16,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0e2a47; tou
 .ui-speed button { min-width: 44px; min-height: 44px; border: 3px solid var(--ink); border-radius: 14px; background: #fff9e8; font-weight: 900; font-size: 15px; box-shadow: 0 3px 0 var(--ink); }
 .ui-speed button.on { background: var(--yellow); }
 .ui-speed button:active { transform: translateY(3px); box-shadow: none; }
-.ui-prog { grid-column: 1 / -1; height: 12px; border: 2px solid var(--ink); border-radius: 8px; background: var(--navy-d); overflow: hidden; }
+.ui-goal { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; margin-top: -2px; }
+.ui-goal b { font-size: 17px; font-weight: 900; color: #9be37a; direction: ltr; unicode-bidi: isolate; display: inline-block; } .ui-goal b.neg { color: #ff8b8b; }
+.ui-goal i { font-style: normal; font-size: 20px; color: #7f95a8; } .ui-goal i.on { color: var(--yellow); text-shadow: 0 1px 0 var(--ink); }
+.ui-prog { position: relative; grid-column: 1 / -1; height: 16px; border: 2px solid var(--ink); border-radius: 8px; background: var(--navy-d); overflow: hidden; }
+.ui-prog em { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px var(--ink), 0 0 3px var(--ink); }
 .ui-prog i { display: block; height: 100%; background: var(--yellow); width: 0; margin-inline-start: 0; }
-.ui-chips { position: absolute; top: calc(var(--sat) + 112px); right: calc(var(--sar) + 10px); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.ui-chips { position: absolute; top: calc(var(--sat) + 146px); right: calc(var(--sar) + 10px); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
 .ui-chip { pointer-events: auto; min-height: 44px; display: flex; align-items: center; gap: 8px; background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 4px 10px; font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 var(--ink); }
 .ui-chip b { font-size: 14px; }
 .ui-chip .st { padding: 2px 8px; border-radius: 10px; background: #ddd; border: 2px solid var(--ink); font-size: 12px; font-weight: 800; }
@@ -87,3 +91,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0e2a47; tou
 .up .btn small { display: block; font-size: 11px; font-weight: 700; }
 .ui-card .go { width: 100%; margin-top: 14px; min-height: 58px; font-size: 20px; }
 .coin { width: 22px; height: 22px; flex: none; }
+
+.ui-chip { flex-direction: column; align-items: flex-start; gap: 2px; max-width: 72vw; text-align: start; }
+.ui-chip .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .ui-chip .tank { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4a5a6a; }
+.ui-chip.warn { flex-direction: row; background: #ffe1e1; }
+.ui-why { font-size: 12px; color: #ffd9a8; margin: 4px 2px 0; }
+.step button:disabled { opacity: .4; }
+.cause { background: #ffe9e9; border: 3px solid var(--ink); border-radius: 14px; padding: 8px 10px; text-align: start; margin: 8px 0; font-size: 14px; }
+.cause b { display: block; } .cause span { display: block; margin-top: 4px; color: #4a5a6a; font-weight: 600; }

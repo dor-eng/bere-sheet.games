@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 // DOM Hebrew RTL UI over the canvas. Reads GameState, calls handlers only (no sim logic, no canvas).
-import { LEVELS } from '../sim/index.ts';
+import { LEVELS, ECON, dayResult } from '../sim/index.ts';
 import type { GameState, UiApi, UiHandlers, Selection, LevelDef, Save, DayResult, UpgradeDef, Truck, TruckJob, Cabin } from '../sim/types.ts';
 
 const inDepot = (c: Cabin) => c.siteId === null && c.slot === -1;
@@ -18,6 +18,18 @@ const JOB: Record<TruckJob, [string, string]> = {
   idle: ['חונה', 's-idle'], toSite: ['בדרך', 's-go'], delivering: ['בדרך', 's-go'], toDepot: ['בדרך', 's-go'],
   pumping: ['שואב', 's-pump'], dumping: ['מרוקן', 's-dump'],
 };
+/** What the truck is doing, in words (destination named). */
+function truckSay(t: Truck, s: GameState): string {
+  const site = t.targetSiteId ? s.sites.find((x) => x.def.id === t.targetSiteId) : undefined, nm = site ? shortName(site.def.name) : '';
+  switch (t.job) {
+    case 'toSite': return nm ? `בדרך ל${nm}` : 'בדרך לאתר';
+    case 'delivering': return t.carrying ? `מביאה ${t.carrying} ${t.carrying === 1 ? 'תא' : 'תאים'}${nm ? ` ל${nm}` : ''}` : (nm ? `בדרך ל${nm}` : 'בדרך');
+    case 'pumping': return nm ? `שואבת ב${nm}` : 'שואבת';
+    case 'toDepot': return 'חוזרת למחסן';
+    case 'dumping': return 'מרוקנת את המיכל';
+    default: return 'פנויה';
+  }
+}
 const SITE_ICON: Record<string, string> = { construction: '🏗️', wedding: '💒', beach: '🏖️', ceremony: '🇮🇱', show: '🎤' };
 const ICON: Record<string, string> = { site: '🏗️', equipment: '🧰', vehicle: '🚚', city: '🏙️', mechanic: '⚙️' };
 const el = (cls: string, tag = 'div') => { const e = document.createElement(tag); e.className = cls; return e; };
@@ -29,6 +41,10 @@ const clock = (t: number, len: number) => {
   const m = Math.floor(360 + Math.min(1, Math.max(0, t / (len || 1))) * 1080); // 06:00 -> 24:00
   return String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 };
+const mmss = (sec: number) => { const s = Math.max(0, Math.ceil(sec)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const shortName = (n: string) => n.split(' - ')[0];
+/** Net of the day exactly as dayResult counts it: fees paid minus fines (the wallet is clamped at 0, so it is not used). */
+const netOf = (s: GameState) => s.sites.reduce((n, st) => n + st.earned - Math.floor(st.overflowSec * st.def.overflowFinePerSec + 1e-6), 0);
 const setHtml = (e: HTMLElement, h: string) => { if (e.dataset.h !== h) { e.dataset.h = h; e.innerHTML = h; } };
 
 export interface UiExtra {
@@ -40,26 +56,35 @@ export function createUi(): UiApi & UiExtra {
   let h: UiHandlers;
   let root: HTMLElement;
   let hud: HTMLElement, chips: HTMLElement, sheet: HTMLElement, toast: HTMLElement, cardWrap: HTMLElement, arrows: HTMLElement;
-  let coinsEl: HTMLElement, clockEl: HTMLElement, progEl: HTMLElement, speedEl: HTMLElement;
+  let goalEl: HTMLElement, starsEl: HTMLElement, leftEl: HTMLElement, coinsEl: HTMLElement, clockEl: HTMLElement, progEl: HTMLElement, speedEl: HTMLElement;
   let sel: Selection = null;
   let last: GameState | null = null;
   let howtoSeen = false; // ponytail: once per page load, not persisted
-  let deliverN = 1, speed: 1 | 2 | 3 = 1, toastT = 0, lastCoins = -1;
+  let deliverN = 0 /* 0 = default: as many as can be delivered */, speed: 1 | 2 | 3 = 1, toastT = 0, lastCoins = -1;
   let view: ((x: number, y: number) => { x: number; y: number } | null) | null = null;
   const hist = new Map<string, { t: number; v: number }[]>();
   let shopSave: Save | null = null;
+  // live bookkeeping per day (reset when the GameState object changes): sites over capacity right now, seconds open with no cabins, lowest wallet
+  let book: { s: GameState; over: Set<string>; noCab: Map<string, number>; t: number; minCoins: number } | null = null;
 
   const say = (msg: string) => { toast.textContent = msg; toast.classList.add('on'); clearTimeout(toastT); toastT = window.setTimeout(() => toast.classList.remove('on'), 2200); };
-  const run = (c: Parameters<UiHandlers['command']>[0]) => { const r = h.command(c); if (!r.ok) say(r.reason ?? 'לא הצלחנו, נסו שוב'); else if (c.type === 'recall') say('המשאבה חוזרת הביתה'); else say(c.type === 'service' ? 'המשאבה בדרך!' : 'התאים בדרך!'); return r; };
+  const run = (c: Parameters<UiHandlers['command']>[0], okMsg?: string) => { const r = h.command(c); if (!r.ok) say(r.reason ?? 'לא הצלחנו, נסו שוב'); else if (okMsg) say(okMsg); else if (c.type === 'recall') say('המשאבה חוזרת הביתה'); else say(c.type === 'service' ? 'המשאבה בדרך!' : 'התאים בדרך!'); return r; };
+  /** How many cabins a deliver command would really bring: min(truck carry, clean stock, free slots) - same as sim command(). */
+  const deliverable = (s: GameState, siteId: string) => {
+    const st = s.sites.find((x) => x.def.id === siteId), spot = st && s.map.spots.find((p) => p.id === st.def.spotId);
+    if (!st || !spot) return 0;
+    return Math.max(0, Math.min(ECON.cabinCarry, s.cabins.filter(clean).length, spot.slots.length - s.cabins.filter((c) => c.siteId === siteId).length));
+  };
+  const deliverCount = (s: GameState, siteId: string) => { const mx = deliverable(s, siteId); return mx < 1 ? 0 : deliverN ? Math.min(deliverN, mx) : mx; };
   const idleTruck = (s: GameState): Truck | undefined => s.trucks.find((t) => t.job === 'idle') ?? s.trucks[0];
 
   function mount(r: HTMLElement, handlers: UiHandlers) {
     root = r; h = handlers; root.textContent = '';
     hud = el('ui-hud ui-hidden');
     hud.innerHTML = `<div class="ui-coins">${COIN}<span data-k="coins">0</span></div><div class="ui-clock" data-k="clock">06:00</div>` +
-      `<div class="ui-speed">${[1, 2, 3].map((x) => `<button data-sp="${x}" aria-label="מהירות ${x}">${x}x</button>`).join('')}</div><div class="ui-prog"><i></i></div>`;
+      `<div class="ui-speed">${[1, 2, 3].map((x) => `<button data-sp="${x}" aria-label="מהירות ${x}">${x}x</button>`).join('')}</div><div class="ui-goal"><span data-k="goal"></span><span data-k="stars"></span></div><div class="ui-prog"><i></i><em data-k="left"></em></div>`;
     coinsEl = hud.querySelector('[data-k=coins]')!; clockEl = hud.querySelector('[data-k=clock]')!;
-    progEl = hud.querySelector('.ui-prog i')!; speedEl = hud.querySelector('.ui-speed')!;
+    progEl = hud.querySelector('.ui-prog i')!; goalEl = hud.querySelector('[data-k=goal]')!; starsEl = hud.querySelector('[data-k=stars]')!; leftEl = hud.querySelector('[data-k=left]')!; speedEl = hud.querySelector('.ui-speed')!;
     hud.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-sp]') as HTMLElement | null;
       if (b) { speed = +b.dataset.sp! as 1 | 2 | 3; h.setSpeed(speed); paintSpeed(); }
@@ -88,29 +113,32 @@ export function createUi(): UiApi & UiExtra {
     if (!b || !last || !sel) return;
     const a = b.dataset.act;
     if (a === 'close') return select(null, last);
-    if (a === 'minus') { deliverN = Math.max(1, deliverN - 1); return refreshSheet(last); }
-    if (a === 'plus') { deliverN = Math.min(8, deliverN + 1); return refreshSheet(last); }
+    if (a === 'minus' && sel.kind === 'site') { deliverN = Math.max(1, deliverCount(last, sel.id) - 1); return refreshSheet(last); }
+    if (a === 'plus' && sel.kind === 'site') { deliverN = Math.min(deliverable(last, sel.id), deliverCount(last, sel.id) + 1); return refreshSheet(last); }
     // deliver loads only at the depot: prefer an idle truck parked there (another may be idle at a dump)
     const depot = last.map.depotNodeId;
     const t = (a === 'deliver' && last.trucks.find((x) => x.job === 'idle' && x.path[x.path.length - 1] === depot)) || idleTruck(last);
     if (!t) return say('אין משאבה פנויה');
     if (a === 'service' && sel.kind === 'site') run({ type: 'service', truckId: t.id, siteId: sel.id });
-    else if (a === 'deliver' && sel.kind === 'site') run({ type: 'deliver', truckId: t.id, siteId: sel.id, count: deliverN });
+    else if (a === 'deliver' && sel.kind === 'site') {
+      const n = deliverCount(last, sel.id), st = last.sites.find((x) => x.def.id === sel!.id);
+      run({ type: 'deliver', truckId: t.id, siteId: sel.id, count: n }, `${n} ${n === 1 ? 'תא' : 'תאים'} בדרך ל${shortName(st?.def.name ?? '')}`);
+    }
     else if (a === 'recall' && sel.kind === 'truck') run({ type: 'recall', truckId: sel.id });
     else if (a === 'service-depot') { /* depot has no extra action */ }
   }
 
   function select(s: Selection, st: GameState) {
-    sel = s; last = st; deliverN = 1;
+    sel = s; last = st; deliverN = 0;
     sheet.dataset.h = '';
     if (!s) { sheet.classList.add('ui-hidden'); return; }
     sheet.classList.remove('ui-hidden'); refreshSheet(st);
   }
 
   function trendOf(id: string): string {
-    const a = hist.get(id); if (!a || a.length < 2) return 'יציב';
+    const a = hist.get(id); if (!a || a.length < 3) return '';
     const d = a[a.length - 1].v - a[0].v;
-    return d > 0.08 ? '⬆ מתמלא מהר' : d > 0.02 ? '↗ מתמלא' : d < -0.02 ? '⬇ מתרוקן' : 'יציב';
+    return d > 0.08 ? 'מתמלא מהר' : d > 0.02 ? 'מתמלא' : d < -0.02 ? 'מתרוקן' : '';
   }
 
   function refreshSheet(s: GameState) {
@@ -122,19 +150,27 @@ export function createUi(): UiApi & UiExtra {
       const cabs = s.cabins.filter((c) => c.siteId === st.def.id).sort((a, b) => a.slot - b.slot);
       const total = cabs.reduce((n, c) => n + c.fill / (c.capacity || 1), 0) / (cabs.length || 1);
       const free = s.cabins.filter(clean).length, wash = s.cabins.filter(dirty).length;
-      const status = st.closed ? 'האתר סגור' : st.open ? 'האתר פתוח' : 'עוד לא נפתח';
+      const mx = deliverable(s, st.def.id), n = deliverCount(s, st.def.id), len = s.level.dayLength;
+      const fills = cabs.map((c) => c.fill), pumpOk = fills.some((f) => f >= ECON.pumpMinFill);
+      const status = st.closed ? 'הסתיים' : st.open ? `פתוח עד ${clock(st.def.closeAt, len)}` : `נפתח ב-${clock(st.def.openAt, len)}`;
+      const trend = st.open && cabs.length ? trendOf(st.def.id) : '';
+      const pay = st.closed ? (st.earned > 0 ? `שולם ${fmt(st.earned)}` : 'התשלום אבד בגלל עומס יתר') : `משלם ${fmt(st.def.fee)} ${COIN} בסיום`;
+      const over = st.open && st.overflowSec > 0 ? ` · עומס יתר ${Math.ceil(st.overflowSec)} שנ' (מעל ${ECON.feeOverflowTolerance} התשלום אובד)` : '';
+      const pumpWhy = st.closed ? 'האתר סגור' : !st.open ? 'האתר עוד לא נפתח' : !cabs.length ? 'אין באתר תאים לשאיבה' : !pumpOk ? `אין מה לשאוב עדיין: שואבים מתא שמלא ${ECON.pumpMinFill}% ומעלה` : '';
+      const delWhy = st.closed ? 'האתר סגור' : !free ? 'אין תאים נקיים במחסן' : mx < 1 ? 'אין מקום פנוי באתר' : '';
+      const pumpBtn = `<div class="row"><button class="btn${cabs.length ? '' : ' alt'}" data-act="service"${pumpWhy ? ' disabled' : ''}>שלח משאבה</button></div>` + (pumpWhy ? `<div class="ui-why">${pumpWhy}</div>` : '');
+      const delBtn = `<div class="row"><div class="step"><button data-act="minus" aria-label="פחות"${n <= 1 ? ' disabled' : ''}>−</button><span>${n}</span><button data-act="plus" aria-label="עוד"${n >= mx ? ' disabled' : ''}>+</button></div>` +
+        `<button class="btn${cabs.length ? ' alt' : ''}" data-act="deliver"${delWhy ? ' disabled' : ''}>הצב תאים</button></div>` + (delWhy ? `<div class="ui-why">${delWhy}</div>` : '');
       html = `<h3><span>${SITE_ICON[st.def.type]} ${esc(st.def.name)}</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
-        `<div class="ui-sub">${status} · <span class="trend">${trendOf(st.def.id)}</span> · ${DROP}</div>` +
+        `<div class="ui-sub">${status}${trend ? ` · <span class="trend">${trend}</span>` : ''} · ${pay}${over}</div>` +
         `<div class="ui-cabins">${cabs.map((c) => { const p = pct(c.fill, c.capacity); return `<div class="cab"><div class="gauge ${heat(p)}"><i style="height:${p}%"></i></div>${p}%</div>`; }).join('') || '<div class="ui-sub">אין תאים באתר</div>'}</div>` +
-        `<div class="ui-sub">${cabs.length ? `ממוצע ${pct(total, 1)}%` : ''} · במחסן: ${free} תאים${wash ? ` (${wash} בשטיפה)` : ''}</div>` +
-        `<div class="row"><button class="btn" data-act="service"${st.closed ? ' disabled' : ''}>שלח משאבה</button></div>` +
-        `<div class="row"><div class="step"><button data-act="minus" aria-label="פחות">−</button><span>${deliverN}</span><button data-act="plus" aria-label="עוד">+</button></div>` +
-        `<button class="btn alt" data-act="deliver"${st.closed || !free ? ' disabled' : ''}>הצב תאים</button></div>`;
+        `<div class="ui-sub">${cabs.length ? `ממוצע ${pct(total, 1)}% · ` : ''}במחסן: ${free} תאים${wash ? ` (${wash} בשטיפה)` : ''}</div>` +
+        (cabs.length ? pumpBtn + delBtn : delBtn + pumpBtn);
     } else if (sel.kind === 'truck') {
       const t = s.trucks.find((x) => x.id === sel!.id); if (!t) return;
       const p = pct(t.tank, t.tankCap);
       html = `<h3><span>🚚 ${esc(t.name)}</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
-        `<div class="ui-sub">מצב: <b>${JOB[t.job][0]}</b> · מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></div>` +
+        `<div class="ui-sub">מצב: <b>${truckSay(t, s)}</b> · מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></div>` +
         (t.carrying ? `<div class="ui-sub">מובילה ${t.carrying} תאים</div>` : '') +
         `<div class="row"><button class="btn alt" data-act="recall"${t.job === 'idle' && t.path[t.path.length - 1] === s.map.depotNodeId ? ' disabled' : ''}>חזרה למחסן</button></div>`;
     } else {
@@ -142,24 +178,41 @@ export function createUi(): UiApi & UiExtra {
       html = `<h3><span>🏭 המחסן</span><button class="ui-x" data-act="close" aria-label="סגור">✕</button></h3>` +
         `<div class="ui-sub">נקיים: <b>${free}</b> · בשטיפה: <b>${wash}</b></div>` +
         (wash ? `<div class="ui-sub">תאים שחוזרים מאתר נשטפים לפני שיוצאים שוב.</div>` : '') +
-        s.trucks.map((t) => { const p = pct(t.tank, t.tankCap); return `<div class="ui-sub">${esc(t.name)} · ${JOB[t.job][0]} · מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></div>`; }).join('') +
+        s.trucks.map((t) => { const p = pct(t.tank, t.tankCap); return `<div class="ui-sub">${esc(t.name)} · ${truckSay(t, s)} · מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></div>`; }).join('') +
         `<div class="ui-sub">הציבו תאים דרך לחיצה על אתר.</div>`;
     }
     setHtml(sheet, html);
   }
 
   let lastSlow = 0;
+  /** Day bookkeeping from the event stream and the clock; restarts when a new GameState appears. */
+  function track(s: GameState) {
+    if (!book || book.s !== s) book = { s, over: new Set(), noCab: new Map(), t: s.time, minCoins: s.coins };
+    const dt = s.time - book.t; book.t = s.time;
+    book.minCoins = Math.min(book.minCoins, s.coins);
+    for (const e of s.events) {
+      if (e.kind === 'overflowStart') book.over.add(e.siteId);
+      else if (e.kind === 'overflowEnd' || e.kind === 'siteClose') book.over.delete(e.siteId);
+    }
+    if (dt > 0 && dt < 1) for (const st of s.sites) if (st.open && !st.closed && !s.cabins.some((c) => c.siteId === st.def.id)) book.noCab.set(st.def.id, (book.noCab.get(st.def.id) ?? 0) + dt);
+  }
+
   function update(s: GameState) {
-    last = s;
+    last = s; track(s);
     const coins = Math.floor(s.coins);
     if (coins !== lastCoins) { lastCoins = coins; coinsEl.textContent = fmt(coins); }
     clockEl.textContent = clock(s.time, s.level.dayLength);
     progEl.style.width = pct(s.time, s.level.dayLength) + '%';
-    // trucks chips
-    setHtml(chips, s.trucks.map((t) => { const p = pct(t.tank, t.tankCap); return `<button class="ui-chip" data-truck="${t.id}" style="font-family:inherit">🚚 <b>${esc(t.name)}</b><span class="st ${JOB[t.job][1]}">${JOB[t.job][0]}</span><span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></button>`; }).join(''));
-    // alerts: sites close to overflow
-    const hot = s.sites.filter((st) => st.open && !st.closed && (st.overflowSec > 0 || s.cabins.some((c) => c.siteId === st.def.id && c.fill / (c.capacity || 1) >= 0.85)));
-    paintAlerts(hot);
+    // goal line: today's net, stars by the real rules (dayResult as if the day ended now), time left
+    const net = Math.round(netOf(s)), res = dayResult({ ...s, over: true });
+    setHtml(goalEl, `יום ${s.level.id} · היום: <b class="${net < 0 ? 'neg' : ''}">${net < 0 ? '−' : '+'}${fmt(Math.abs(net))}</b> מתוך ${fmt(s.level.coinTarget)}`);
+    setHtml(starsEl, [0, 1, 2].map((i) => `<i class="${i < res.stars ? 'on' : ''}">${i < res.stars ? '★' : '☆'}</i>`).join(''));
+    leftEl.textContent = `נשארו ${mmss(s.level.dayLength - s.time)}`;
+    // trucks chips: what each one is doing, in words; the bar is the tank
+    setHtml(chips, s.trucks.map((t) => { const p = pct(t.tank, t.tankCap); return `<button class="ui-chip" data-truck="${t.id}" style="font-family:inherit"><span class="top">🚚 <b>${esc(t.name)}</b><span class="st ${JOB[t.job][1]}">${esc(truckSay(t, s))}</span></span><span class="tank">מיכל ${p}% <span class="mini ${heat(p)}"><i style="width:${p}%"></i></span></span></button>`; }).join(''));
+    // alerts: sites overflowing / open with no cabins RIGHT NOW (from events, not history), or a cabin nearly full
+    const hot = s.sites.filter((st) => st.open && !st.closed && (book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id) || s.cabins.some((c) => c.siteId === st.def.id && c.fill / (c.capacity || 1) >= 0.85)));
+    paintAlerts(hot, s);
     // slow lane (4Hz): history + open sheet
     const now = performance.now();
     if (now - lastSlow > 250) {
@@ -176,29 +229,31 @@ export function createUi(): UiApi & UiExtra {
     }
   }
 
-  function paintAlerts(hot: GameState['sites']) {
-    if (!view) { // fallback: alert chips in the chip column
-      const html = hot.map((st) => `<button class="ui-chip" data-site="${st.def.id}" style="font-family:inherit;background:#ffe1e1">⚠️ <b>${esc(st.def.name)}</b></button>`).join('');
-      setHtml(arrows, ''); alertChips.innerHTML = html;
-      return;
-    }
-    alertChips.innerHTML = '';
+  function paintAlerts(hot: GameState['sites'], s: GameState) {
+    const why = (st: GameState['sites'][number]) => (!s.cabins.some((c) => c.siteId === st.def.id) ? 'בלי תאים!' : book!.over.has(st.def.id) ? 'גולש!' : 'כמעט מלא');
+    const chip = (st: GameState['sites'][number]) => `<button class="ui-chip warn" data-site="${st.def.id}" style="font-family:inherit">⚠️ <b>${esc(shortName(st.def.name))}</b> ${why(st)}</button>`;
     const W = root.clientWidth, H = root.clientHeight, m = 36;
-    let out = '';
-    const pos: string[] = [];
+    const hudB = hud.getBoundingClientRect().bottom, sheetT = sel ? sheet.getBoundingClientRect().top : H;
+    const asChip: string[] = [], pos: string[] = [];
     for (const st of hot) {
-      const p = view(st.x, st.y); if (!p) continue;
-      if (p.x >= 0 && p.x <= W && p.y >= 0 && p.y <= H) continue; // visible on screen
-      const cx = W / 2, cy = H / 2, dx = p.x - cx, dy = p.y - cy;
-      const k = Math.min((W / 2 - m) / (Math.abs(dx) || 1e-6), (H / 2 - m - 100) / (Math.abs(dy) || 1e-6));
-      const x = cx + dx * k, y = cy + dy * k, ang = Math.atan2(dy, dx);
-      pos.push(`<button class="ui-arrow" data-site="${st.def.id}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px" aria-label="${esc(st.def.name)}"><span style="display:block;transform:rotate(${ang.toFixed(2)}rad)">➤</span></button>`);
+      const p = view ? view(st.x, st.y) : null;
+      const off = !p || p.x < 0 || p.x > W || p.y < 0 || p.y > H;
+      const covered = !!p && !off && (p.y < hudB + 4 || p.y > sheetT - 4); // on screen but under the HUD or the sheet
+      const urgent = book!.over.has(st.def.id) || !s.cabins.some((c) => c.siteId === st.def.id);
+      if (!view || covered || urgent) asChip.push(chip(st));
+      if (p && off) {
+        const cx = W / 2, cy = H / 2, dx = p.x - cx, dy = p.y - cy;
+        const k = Math.min((W / 2 - m) / (Math.abs(dx) || 1e-6), (H / 2 - m - 100) / (Math.abs(dy) || 1e-6));
+        const x = cx + dx * k, y = cy + dy * k, ang = Math.atan2(dy, dx);
+        pos.push(`<button class="ui-arrow" data-site="${st.def.id}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px" aria-label="${esc(st.def.name)}"><span style="display:block;transform:rotate(${ang.toFixed(2)}rad)">➤</span></button>`);
+      }
     }
-    out = pos.join('');
+    alertChips.style.bottom = `calc(var(--sab) + ${sel ? Math.round(H - sheetT) + 10 : 12}px)`;
+    setHtml(alertChips, asChip.join(''));
     arrows.style.pointerEvents = 'none';
-    setHtml(arrows, out);
+    setHtml(arrows, pos.join(''));
   }
-  const alertChips = el('ui-chips'); alertChips.style.top = 'auto'; alertChips.style.bottom = 'calc(var(--sab) + 300px)';
+  const alertChips = el('ui-chips'); alertChips.style.top = 'auto'; alertChips.style.bottom = 'calc(var(--sab) + 12px)';
   const onAlert = (e: Event) => {
     const b = (e.target as HTMLElement).closest('[data-site]') as HTMLElement | null;
     if (!b || !last) return;
@@ -219,7 +274,8 @@ export function createUi(): UiApi & UiExtra {
       `<li>🚽 <span>לוחצים על אתר ← <b>הצב תאים</b>: המשאית מביאה תאים מהמחסן.</span></li>` +
       `<li>🚚 <span>תא מתמלא? לוחצים על האתר ← <b>שלח משאבה</b>: המשאית שואבת ומרוקנת במחסן.</span></li>` +
       `<li>⚠️ <span>תא שמתמלא עד הסוף = עומס יתר = קנס. מקדימים את המשאבה.</span></li>` +
-      `<li>${COIN} <span>כל אירוע משלם. בסוף היום מקבלים כוכבים, ובכסף קונים משאבה, מיכל ותאים טובים יותר.</span></li>` +
+      `<li>⏰ <span>גם אתר פתוח <b>בלי תאים</b> מקבל קנס. מציבים תאים <b>לפני</b> שהאירוע נפתח.</span></li>` +
+      `<li>${COIN} <span>התשלום מגיע כשהאירוע נגמר, ואובד אם היה עומס יתר ארוך. בכסף קונים שדרוגים.</span></li>` +
       `</ul>` +
       `<button class="btn go" data-ok>הבנתי, יאללה</button>`);
     cardWrap.querySelector('[data-ok]')!.addEventListener('click', then);
@@ -233,12 +289,29 @@ export function createUi(): UiApi & UiExtra {
       `<h2>יום ${level.id}: ${esc(level.title)}</h2>` +
       `<div class="ui-sub" style="color:#4a5a6a;display:flex;justify-content:center;gap:6px;align-items:center">בקופה: <b>${fmt(save.coins)}</b>${COIN}</div>` +
       `<h4>האתרים היום</h4><div class="sites">${sites}</div>` +
-      `<h4>המטרה</h4><ul class="rules"><li>${STAR.replace('<svg', '<svg width="26" height="26"')} כוכב: מסיימים את היום ברווח</li>` +
-      `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שני כוכבים: בלי אף עומס יתר</li>` +
-      `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שלושה: גם ${fmt(level.coinTarget)} ${COIN}</li></ul>` +
+      `<h4>המטרה</h4><ul class="rules"><li>${STAR.replace('<svg', '<svg width="26" height="26"')} כוכב: מסיימים את היום ברווח (שכר פחות קנסות גדול מאפס)</li>` +
+      `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שני כוכבים: גם עומס יתר של עד ${ECON.feeOverflowTolerance} שניות בסך הכל</li>` +
+      `<li>${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')}${STAR.replace('<svg', '<svg width="26" height="26"')} שלושה: גם רווח של ${fmt(level.coinTarget)} ${COIN} ביום (הרווח של היום, לא מה שבקופה)</li></ul>` +
       `<button class="btn go" data-go>יוצאים לעבודה</button><button class="btn alt" data-how style="margin-top:8px">איך משחקים?</button>`);
     cardWrap.querySelector('[data-go]')!.addEventListener('click', () => { hideCard(); speed = 1; paintSpeed(); h.setSpeed(1); h.startDay(); });
     cardWrap.querySelector('[data-how]')!.addEventListener('click', () => showHowTo(() => showDayStart(level, save)));
+  }
+
+  /** Main reason the day lost stars: the site with the biggest loss (fine + forfeited fee), with one tip. Null when nothing to say. */
+  function lossCause(r: DayResult): { line: string; tip: string } | null {
+    const s = last; if (!s || s.level.id !== r.levelId) return null;
+    let worst: GameState['sites'][number] | null = null, wl = 0, wf = 0, wForfeit = false;
+    for (const st of s.sites) {
+      const fine = Math.floor(st.overflowSec * st.def.overflowFinePerSec + 1e-6), forfeit = st.overflowSec > ECON.feeOverflowTolerance;
+      const loss = fine + (forfeit ? st.def.fee : 0);
+      if (loss > wl) { worst = st; wl = loss; wf = fine; wForfeit = forfeit; }
+    }
+    if (!worst) return r.earned - r.fines <= 0 ? { line: 'לא נכנס כסף: התשלום מגיע רק כשהאירוע נגמר.', tip: 'הציבו תאים באתרים ושלחו משאבה לפני שהם מתמלאים.' } : null;
+    const nm = worst.def.name, sec = Math.round(worst.overflowSec), nc = Math.round(book?.s === s ? book.noCab.get(worst.def.id) ?? 0 : 0);
+    const noCabMain = nc >= worst.overflowSec * 0.5;
+    const line = (noCabMain ? `האתר ${nm} היה פתוח בלי תאים ${nc} שניות` : `האתר ${nm} היה בעומס יתר ${sec} שניות`) + `: קנס ${fmt(wf)}` + (wForfeit ? ` והתשלום (${fmt(worst.def.fee)}) אבד` : '');
+    const tip = noCabMain ? `הציבו תאים לפני הפתיחה (${clock(worst.def.openAt, s.level.dayLength)}).` : 'שלחו משאבה כשהתאים מגיעים לכ-70%, לפני שהם מלאים.';
+    return { line, tip };
   }
 
   function showDayEnd(r: DayResult, save: Save, next: LevelDef | undefined) {
@@ -246,12 +319,16 @@ export function createUi(): UiApi & UiExtra {
     // a level's unlock describes what the following level brings, so show the one just won
     const u = r.stars >= 1 ? LEVELS.find((l) => l.id === r.levelId)?.unlock : undefined;
     const stars = [0, 1, 2].map((i) => STAR.replace('<svg', `<svg class="${i < r.stars ? 'on' : ''}" style="--d:${0.3 + i * 0.35}s"`)).join('');
+    const cause = lossCause(r), won = r.stars >= 1;
+    const kept = !won && !!last && last.level.id === r.levelId && !!book && book.s === last && book.minCoins < last.coinsStart;
     const msg = r.stars === 3 ? 'מושלם! אלופי השירות!' : r.stars === 2 ? 'יופי של יום!' : r.stars === 1 ? 'סיימנו! אפשר יותר' : 'יום קשה, ננסה שוב';
     showCard(`<h2>${msg}</h2><div class="big-stars">${stars}</div>` +
       `<div class="sum"><div class="pos">הרווחנו<b>+${fmt(r.earned)}</b></div><div class="neg">קנסות<b>−${fmt(r.fines)}</b></div><div>בקופה<b>${fmt(save.coins)}</b></div></div>` +
-      (r.stars < 3 ? `<div class="ui-sub" style="color:#4a5a6a">כוכב שלישי: ${fmt(r.coinTarget)} מטבעות בלי עומס יתר</div>` : '') +
+      (cause && r.stars < 2 ? `<div class="cause"><b>${esc(cause.line)}</b><span>טיפ: ${esc(cause.tip)}</span></div>` : '') +
+      (kept ? `<div class="ui-sub" style="color:#4a5a6a">הקנסות לא נגעו בחיסכון: ${fmt(save.coins)} נשארו בקופה.</div>` : '') +
+      (r.stars < 3 ? `<div class="ui-sub" style="color:#4a5a6a">כוכב שלישי: רווח של ${fmt(r.coinTarget)} ביום, עם עד ${ECON.feeOverflowTolerance} שניות עומס יתר</div>` : '') +
       (u ? `<div class="teaser"><div style="font-size:34px">${ICON[u.kind] ?? '🎁'}</div><div><b>בשלב הבא נפתח: ${esc(u.name)}</b><span>${esc(u.desc)}</span></div></div>` : '') +
-      `<h4>שדרוגים</h4><div class="shop" data-shop></div><button class="btn go" data-next>ליום הבא</button>`);
+      `<h4>שדרוגים</h4><div class="shop" data-shop></div><button class="btn go" data-next>${won ? 'ליום הבא' : `נסה שוב את יום ${r.levelId}`}</button>`);
     paintShop();
     cardWrap.querySelector('[data-shop]')!.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-up]') as HTMLButtonElement | null;

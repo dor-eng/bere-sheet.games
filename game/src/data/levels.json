@@ -5,10 +5,10 @@
   "dayLength": 200,
   "coinTarget": 280,
   "unlock": {
-   "kind": "equipment",
-   "name": "נגרר שירותים יוקרתי",
-   "desc": "הבא: נגרר יוקרה לחתונות, מוכן לאירוע הבא",
-   "icon": "icon-luxury-trailer"
+   "kind": "site",
+   "name": "עוד אתר בנייה",
+   "desc": "הבא: שני אתרי בנייה וגם חתונה. צריך לחלק את התאים ביניהם",
+   "icon": "icon-cabin"
   },
   "sites": [
    {
@@ -78,8 +78,8 @@
   "coinTarget": 480,
   "unlock": {
    "kind": "event",
-   "name": "חתונת גן",
-   "desc": "גלי טקס וארוחה, יחד עם עבודה שוטפת באתרי הבנייה",
+   "name": "חתונה גדולה",
+   "desc": "הבא: חתונה גדולה שמשלמת יותר, וגם שני אתרי בנייה",
    "icon": "icon-cabin"
   },
   "sites": [
@@ -178,10 +178,10 @@
   "dayLength": 240,
   "coinTarget": 480,
   "unlock": {
-   "kind": "equipment",
-   "name": "שדרוג מכון הרחצה",
-   "desc": "החזרת תאים מהירה יותר למחסן",
-   "icon": "icon-pump"
+   "kind": "city",
+   "name": "עיר החוף",
+   "desc": "הבא: עיר החוף. אתרי חוף שמתמלאים מהר",
+   "icon": "icon-star"
   },
   "sites": [
    {
