@@ -154,6 +154,7 @@ export interface RenderExtra {
 
 export function createRender(): RenderApi & RenderExtra {
   let app: Application, cam: Camera, map: CityMap;
+  let hud: HTMLElement | null = null, dayState: GameState | null = null;
   let world: Container, actors: Container, padLayer: Container, gates: Graphics, labels: Container;
   const ring = new Graphics(), arrow = new Graphics();
   const fx = new FxLayer();
@@ -384,6 +385,14 @@ export function createRender(): RenderApi & RenderExtra {
     update(s, dt) {
       if (!app || !cam) return;
       clock += dt;
+      hud ??= document.querySelector<HTMLElement>('.ui-hud');
+      const hb = hud?.getBoundingClientRect().bottom ?? 0; if (hb > 0) cam.setTop(hb); // hidden HUD (a card is up) = 0: keep the last one
+      if (s !== dayState) { // new day: start on the whole-day view (all sites, trucks, depot)
+        dayState = s;
+        const ps = [...s.sites.map((st) => iso(st.x, st.y)), ...s.trucks.map((t) => iso(t.x, t.y)), iso(map.depot.x, map.depot.y)];
+        const xs = ps.map((p) => p.x), ys = ps.map((p) => p.y);
+        cam.overview([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+      }
       if (s.time < lastEventTime) lastEventTime = -1; // new day
       for (const id of staleSiteIds(sites.keys(), s)) dropSite(id); // new day: drop renderer sites the state no longer has
       const focusId = needsActionId(s), lk = LABEL_CSS / cam.scale;

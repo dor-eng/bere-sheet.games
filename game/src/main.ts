@@ -49,7 +49,7 @@ ui.mount(document.getElementById('ui')!, {
 });
 ui.setPause((p) => { paused = p; }); // the guided first day holds the clock while it waits for a tap
 ui.setView((x, y) => render.view(x, y)); // world -> screen, enables off-screen edge arrows
-(window as any).__game = { get state() { return state; }, get save() { return save; }, command: (c: any) => command(state, c), focus: (x: number, y: number) => render.focus(x, y) }; // test hook
+(window as any).__game = { get state() { return state; }, get save() { return save; }, command: (c: any) => command(state, c), focus: (x: number, y: number) => render.focus(x, y), view: (x: number, y: number) => render.view(x, y) }; // test hook
 
 let last = performance.now();
 const STEP = 1 / 30;
