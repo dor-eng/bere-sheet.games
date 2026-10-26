@@ -34,6 +34,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0e2a47; tou
 
 /* off-screen alerts */
 .ui-arrow { position: absolute; width: 48px; height: 48px; margin: -24px 0 0 -24px; border: 3px solid var(--ink); border-radius: 50%; background: var(--red); color: #fff; font-weight: 900; font-size: 22px; display: grid; place-items: center; box-shadow: 0 3px 0 var(--ink); animation: pulse .7s ease-in-out infinite alternate; padding: 0; }
+.ui-arrow.pin { width: 42px; height: 42px; margin: -21px 0 0 -21px; background: #fff8e8; color: var(--ink); font-size: 20px; animation: none; box-shadow: 0 3px 0 var(--ink); }
+.ui-arrow.pin i { position: absolute; left: 50%; top: 50%; font-style: normal; font-size: 13px; color: var(--ink); pointer-events: none; }
 @keyframes pulse { to { transform: scale(1.15); } }
 
 /* sheet */

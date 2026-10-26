@@ -273,6 +273,18 @@ export function createUi(): UiApi & UiExtra {
         pos.push(`<button class="ui-arrow" data-site="${st.def.id}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px" aria-label="${esc(st.def.name)}"><span style="display:block;transform:rotate(${ang.toFixed(2)}rad)">➤</span></button>`);
       }
     }
+    // calm edge markers: every other site and the trucks when off screen, so the player knows there is more map (tap = go there)
+    const v = view; if (v) {
+      const yMin = hudB + 30, yMax = (sel ? sheetT : H) - 30;
+      const pin = (attr: string, icon: string, label: string, x: number, y: number) => {
+        const p = v(x, y); if (!p || p.x >= 0 && p.x <= W && p.y >= hudB && p.y <= H) return;
+        const cx = W / 2, cy = (yMin + yMax) / 2, dx = p.x - cx, dy = p.y - cy;
+        const k = Math.min((W / 2 - 38) / (Math.abs(dx) || 1e-6), ((yMax - yMin) / 2) / (Math.abs(dy) || 1e-6)), ang = Math.atan2(dy, dx);
+        pos.push(`<button class="ui-arrow pin" ${attr} style="left:${(cx + dx * k).toFixed(0)}px;top:${(cy + dy * k).toFixed(0)}px" aria-label="${esc(label)}">${icon}<i style="transform:translate(-50%,-50%) rotate(${ang.toFixed(2)}rad) translateX(29px)">➤</i></button>`);
+      };
+      for (const st of s.sites) if (!hot.includes(st)) pin(`data-site="${st.def.id}"`, SITE_ICON[st.def.type] ?? '📍', st.def.name, st.x, st.y);
+      for (const t of s.trucks) pin(`data-truck="${t.id}"`, '🚚', t.name, t.x, t.y);
+    }
     alertChips.style.bottom = `calc(var(--sab) + ${sel ? Math.round(H - sheetT) + 10 : 12}px)`;
     setHtml(alertChips, asChip.join(''));
     arrows.style.pointerEvents = 'none';
@@ -280,6 +292,8 @@ export function createUi(): UiApi & UiExtra {
   }
   const alertChips = el('ui-chips'); alertChips.style.top = 'auto'; alertChips.style.bottom = 'calc(var(--sab) + 12px)';
   const onAlert = (e: Event) => {
+    const tb = (e.target as HTMLElement).closest('[data-truck]') as HTMLElement | null, t = tb && last?.trucks.find((x) => x.id === tb.dataset.truck);
+    if (t && last) { h.focus(t.x, t.y); select({ kind: 'truck', id: t.id }, last); return; }
     const b = (e.target as HTMLElement).closest('[data-site]') as HTMLElement | null;
     if (!b || !last) return;
     const st = last.sites.find((x) => x.def.id === b.dataset.site); if (st) { h.focus(st.x, st.y); select({ kind: 'site', id: st.def.id }, last); }

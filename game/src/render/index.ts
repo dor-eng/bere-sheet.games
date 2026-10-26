@@ -387,9 +387,9 @@ export function createRender(): RenderApi & RenderExtra {
       clock += dt;
       hud ??= document.querySelector<HTMLElement>('.ui-hud');
       const hb = hud?.getBoundingClientRect().bottom ?? 0; if (hb > 0) cam.setTop(hb); // hidden HUD (a card is up) = 0: keep the last one
-      if (s !== dayState) { // new day: start on the whole-day view (all sites, trucks, depot)
+      if (s !== dayState && s.sites.length) { // new day: the map fills the screen, centred on the day's sites
         dayState = s;
-        const ps = [...s.sites.map((st) => iso(st.x, st.y)), ...s.trucks.map((t) => iso(t.x, t.y)), iso(map.depot.x, map.depot.y)];
+        const ps = s.sites.map((st) => iso(st.x, st.y));
         const xs = ps.map((p) => p.x), ys = ps.map((p) => p.y);
         cam.overview([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
       }
